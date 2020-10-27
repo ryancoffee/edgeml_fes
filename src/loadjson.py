@@ -67,13 +67,14 @@ def main():
     if len(sys.argv)<2:
         print('syntax: loadjason.py <datafilename>')
         return
-    m = re.search('(.*)\.json',sys.argv[1])
+    m = re.search('(.*)/(.*)\.json',sys.argv[1])
     if not m:
         print('no fname match')
         print('syntax: loadjason.py <datafilename>')
         return
     fname = m.group(0)
-    fnamehead = m.group(1)
+    fpath = m.group(1)
+    fnamehead = m.group(2)
 
 
     data = loadjson(fname)
@@ -81,10 +82,10 @@ def main():
     _ = [print(v[:10]) for v in vallist]
     for i in range(len(namelist)):
         header = 'det = %s\ttstart = \t %.3f\ttstep = %.3f'%(namelist[i],tstartlist[i],tsteplist[i])
-        np.savetxt('%s.%s.dat'%(fnamehead,namelist[i]),vallist[i],fmt='%.3e')
+        np.savetxt('%s/processed/%s.%s.dat'%(fpath,fnamehead,namelist[i]),vallist[i],fmt='%.3e')
 
     out = np.c_[vallist[0],vallist[1],vallist[2][::2]]
-    np.savetxt('%s.detspasted.dat'%(fnamehead),out,fmt='%.3e')
+    np.savetxt('%s/processed/%s.detspasted.dat'%(fpath,fnamehead),out,fmt='%.3e')
 
     #sz = int(2**13)
     #rollsz = int(2**8)
@@ -115,7 +116,7 @@ def main():
         else:
             tmp = np.log(np.abs(np.tanh(FMAT/8)))
             LY += np.where(tmp>-10,tmp,-10)
-        np.savetxt('%s.%s.TAEraw'%(fnamehead,namelist[ind]),np.c_[F,np.exp(LY)],fmt='%.3e')
+        np.savetxt('%s/processed/%s.%s.TAEraw'%(fpath,fnamehead,namelist[ind]),np.c_[F,np.exp(LY)],fmt='%.3e')
 
         print('========== Now, working on the Schlieren idea ===========')
 
@@ -127,7 +128,7 @@ def main():
         print(NEWOUT[0].shape)
         for i in range(1,nthetas):
             NEWOUT[0] = np.where(NEWOUT[i]>NEWOUT[0],NEWOUT[i],NEWOUT[0])
-        np.savetxt('%s.%s.TAEfilt'%(fnamehead,namelist[ind]),np.c_[F[:sz//2],np.exp(NEWOUT[0][:sz//2,:NEWOUT[0].shape[1]//2])],fmt='%.3e')
+        np.savetxt('%s/processed/%s.%s.TAEfilt'%(fpath,fnamehead,namelist[ind]),np.c_[F[:sz//2],np.exp(NEWOUT[0][:sz//2,:NEWOUT[0].shape[1]//2])],fmt='%.3e')
 
         sz = sz_ktf
         rollsz = sz
@@ -151,7 +152,7 @@ def main():
         else:
             tmp = np.log(np.abs(np.tanh(FMAT/8)))
             LY += np.where(tmp>-10,tmp,-10)
-        np.savetxt('%s.%s.KTFraw'%(fnamehead,namelist[ind]),np.c_[F,np.exp(LY)],fmt='%.3e')
+        np.savetxt('%s/processed/%s.%s.KTFraw'%(fpath,fnamehead,namelist[ind]),np.c_[F,np.exp(LY)],fmt='%.3e')
 
 
         qLY = np.fft.fft2(LY)
@@ -162,7 +163,7 @@ def main():
         print(NEWOUT[0].shape)
         for i in range(1,nthetas):
             NEWOUT[0] = np.where(NEWOUT[i]>NEWOUT[0],NEWOUT[i],NEWOUT[0])
-        np.savetxt('%s.%s.KTFfilt'%(fnamehead,namelist[ind]),np.c_[F[:sz//2],np.exp(NEWOUT[0][:sz//2,:NEWOUT[0].shape[1]//4])],fmt='%.3e')
+        np.savetxt('%s/processed/%s.%s.KTFfilt'%(fpath,fnamehead,namelist[ind]),np.c_[F[:sz//2],np.exp(NEWOUT[0][:sz//2,:NEWOUT[0].shape[1]//4])],fmt='%.3e')
         '''
         if ind==0:
             collect = LY[::2,:]
@@ -193,7 +194,7 @@ def main():
         for i in range(Y.shape[1]):
             out += [np.max(np.fft.ifft(Y[:,i]*KERN_C,axis=1).real,axis=1) + np.max(np.fft.ifft(Y[:,i]*KERN_S,axis=1).real,axis=1)]
         print(np.c_[out].shape)
-        np.savetxt('%s.%s.conv'%(fnamehead,namelist[ind]),np.fft.ifft(KERN_S,axis=0).real,fmt='%.3e')
+        np.savetxt('%s/processed/%s.%s.conv'%(fpath,fnamehead,namelist[ind]),np.fft.ifft(KERN_S,axis=0).real,fmt='%.3e')
         '''
 
         '''
@@ -212,10 +213,10 @@ def main():
 
         '''
         LYfilt = np.fft.ifft(np.fft.fft(LY,axis=0)*QFILT,axis=0).real
-        np.savetxt('%s.ece64.pspecScaledFilt'%(fnamehead),np.exp(LYfilt),fmt='%.3e')
+        np.savetxt('%s/processed/%s.ece64.pspecScaledFilt'%(fpath,fnamehead),np.exp(LYfilt),fmt='%.3e')
         '''
 
-    np.savetxt('%s.%s.%s.mult'%(fnamehead,namelist[0],namelist[2]),np.exp(collect),fmt='%.3e')
+    np.savetxt('%s/processed/%s.%s.%s.mult'%(fpath,fnamehead,namelist[0],namelist[2]),np.exp(collect),fmt='%.3e')
 
 
     return

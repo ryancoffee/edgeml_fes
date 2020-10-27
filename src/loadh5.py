@@ -67,13 +67,14 @@ def main():
     if len(sys.argv)<2:
         print('syntax: loadh5.py <datafilename>')
         return
-    m = re.search('(.*)\.hdf5',sys.argv[1])
+    m = re.search('(.*)/(.*)\.hdf5',sys.argv[1])
     if not m:
         print('no fname match')
-        print('syntax: loadh5.py <datafilename>')
+        print('syntax: ./src/loadh5.py <datafilename>')
         return
     fname = m.group(0)
-    fnamehead = m.group(1)
+    fpath = m.group(1)
+    fnamehead = m.group(2)
 
     sz_tae = int(2**10) # TAE is Torroidal Alfvenic Mode in the 50..200kHz regime
     sz = sz_tae
@@ -99,8 +100,8 @@ def main():
                 LS = np.column_stack((np.log(S),np.fliplr(np.log(S))))
                 if len(LFMAT)<2*S.shape[1]:
                     LFMAT = np.tile(LF,(2*y.shape[1],1)).T
-                print('%s.shot_%s.chan_%s.power'%(fnamehead,shot,chan))
-                np.savetxt('%s.shot_%s.chan_%s.power'%(fnamehead,shot,chan),np.exp(LS + LFMAT)[:sz//2,:S.shape[1]],fmt='%.3e')
+                print('%s/processed/%s.shot_%s.chan_%s.power'%(fpath,fnamehead,shot,chan))
+                np.savetxt('%s/processed/%s.shot_%s.chan_%s.power'%(fpath,fnamehead,shot,chan),np.exp(LS + LFMAT)[:sz//2,:S.shape[1]],fmt='%.3e')
                 '''
             for roll in range(nrolls):
                 out = np.cov(y[:,roll,:].T)
@@ -109,11 +110,11 @@ def main():
                     for i in range(nchans):
                         for j in range(nchans):
                             out[i,j] /= np.sqrt(diag[i]*diag[j])
-                np.savetxt('%s.shot_%s.roll_%s.cov'%(fnamehead,shot,roll),out,fmt='%.3e')
+                np.savetxt('%s/processed/%s.shot_%s.roll_%s.cov'%(fpath,fnamehead,shot,roll),out,fmt='%.3e')
                 print('saved roll %i with shape %s'%(roll,out.shape))
                 '''
                 for i in range(16):
-                    np.savetxt('%s.shot_%s.roll_%s.covimg%i'%(fnamehead,shot,roll,i),out[:,i].reshape(-2,8),fmt='%.3e')
+                    np.savetxt('%s/processed/%s.shot_%s.roll_%s.covimg%i'%(fpath,fnamehead,shot,roll,i),out[:,i].reshape(-2,8),fmt='%.3e')
                 '''
     return
 
