@@ -65,7 +65,6 @@ def separatedets(data):
         detdata += [np.array(data[det]['data']['__ndarray_tolist__'])]
     return detname,dettstep,dettstart,detdata
 
-
 def main():
     if len(sys.argv)<2:
         print('syntax: loadh5.py <datafilename>')
@@ -112,19 +111,27 @@ def main():
                 print('%s/processed/%s.shot_%s.chan_%s.power'%(fpath,fnamehead,shot,chan))
                 np.savetxt('%s/processed/%s.shot_%s.chan_%s.power'%(fpath,fnamehead,shot,chan),np.exp(LS + LFMAT)[:sz//2,:S.shape[1]],fmt='%.3e')
                 '''
+            images = []
+            print('computing covariances')
             for roll in range(nrolls):
-                out = np.cov(y[:,roll,:].T)
-                diag = np.diag(out)
-                if (out.shape[0] == nchans):
+                images += [np.cov(y[:,roll,:].T)]
+                diag = np.diag(images[-1])
+                if (images[-1].shape[0] == nchans):
                     for i in range(nchans):
                         for j in range(nchans):
-                            out[i,j] /= np.sqrt(diag[i]*diag[j])
-                np.savetxt('%s/processed/%s.shot_%s.roll_%s.cov'%(fpath,fnamehead,shot,roll),out,fmt='%.3e')
-                print('saved roll %i with shape %s'%(roll,out.shape))
+                            images[-1][i,j] /= np.sqrt(diag[i]*diag[j])
+                #np.savetxt('%s/processed/%s.shot_%s.roll_%s.cov'%(fpath,fnamehead,shot,roll),out,fmt='%.3e')
+                #print('saved roll %i with shape %s'%(roll,out.shape))
                 '''
                 for i in range(16):
                     np.savetxt('%s/processed/%s.shot_%s.roll_%s.covimg%i'%(fpath,fnamehead,shot,roll,i),out[:,i].reshape(-2,8),fmt='%.3e')
                 '''
+            print('saving video out')
+            shape = (images[0].shape[1], images[0].shape[0])
+            fourcc = cv.VideoWriter_fourcc(*"mp4v")  # XVID for avi, mp4v for mp4
+            out = cv.VideoWriter('%s/processed/vidout_%s_%s.mp4'%(fpath,det,shot), fourcc, 20.0, shape, 0)
+            print('finished shot%s'%shot)
+
     return
 
 
