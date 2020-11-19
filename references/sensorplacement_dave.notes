@@ -1,0 +1,14 @@
+Hi Ryan,
+
+Attached is the BES channel layout for the example data you are looking at. Shot numbers at the bottom each page correspond to datasets in the HDF5 file (145745 is missing, but should be identical to 145747).
+
+Ryan, Dan, Egemen - As you see, the BES channel layout can change day-to-day. We'll need to decide whether to develop BES edge ML models for 1) arbitrary channel layouts or 2) a specific layout with the restriction that the BES edge ML only be in the PCS control loop when BES is in the proper channel layout. I’m inclined to start model development for a specific layout and broaden to arbitrary layout after some initial success.
+
+FYI - I’ll be late or maybe completely miss our bi-weekly meeting on Wednesday.  I have a long-scheduled eye exam that I need to keep.
+
+-Dave
+
+--
+David R. Smith
+University of Wisconsin-Madison
+https://fusionlab.ep.wisc.edu/turbulence/

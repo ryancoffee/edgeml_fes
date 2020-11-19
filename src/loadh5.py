@@ -6,6 +6,8 @@ import os
 import sys
 import re
 
+from BESmappings import BESmap
+
 def blurTH(M,th=0.,center=0.,bwd0=.1,bwd1=1):
     x=np.linspace(-1*M.shape[1]/M.shape[0],1*M.shape[1]/M.shape[0],M.shape[1])
     y=np.linspace(-1,1,M.shape[0])
@@ -63,9 +65,16 @@ def separatedets(data):
         detdata += [np.array(data[det]['data']['__ndarray_tolist__'])]
     return detname,dettstep,dettstart,detdata
 
+
 def main():
     if len(sys.argv)<2:
         print('syntax: loadh5.py <datafilename>')
+        test = BESmap()
+        test.setinds(4,4,63)
+        test.setinds(5,7,31)
+        print(test.getinds())
+        print(test.getmap())
+
         return
     m = re.search('(.*)/(.*)\.hdf5',sys.argv[1])
     if not m:
