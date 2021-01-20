@@ -10,7 +10,7 @@ import numpy as np
 '''
 class BESmap:
     def __init__(self):
-        self.chanmap = np.full((64,64),np.uint8(255),dtype=np.uint8)
+        self.chanmap = np.full((64,64),np.uint8(-1),dtype=np.uint8)
 
     def getinds(self):
         return np.where(self.chanmap < 255)
@@ -22,5 +22,6 @@ class BESmap:
 
     def setinds(self,r,c,v):
         self.chanmap[r,c] = v
+
 
 
