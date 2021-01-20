@@ -71,8 +71,8 @@ def main():
         test = BESmap()
         test.setinds(4,4,63)
         test.setinds(5,7,31)
-        print(test.getinds())
-        print(test.getmap())
+        print(test.getspmap())
+        test.print()
 
         return
     m = re.search('(.*)/(.*)\.hdf5',sys.argv[1])

@@ -9,7 +9,6 @@ from scipy.sparse import coo_matrix
     Create a dictionary the links shot number string e.g. 's145745' to the configuration
     In the main code and store as meta maybe in h5 file or companion h5 the configuration mapping and the list of configurations 
 '''
-
 class BESmap():
     '''
         Remember, the channels here need to by [1 ... 256) , and 
@@ -17,8 +16,8 @@ class BESmap():
         Separatrix flag is 1 'inside', 2 'borderline', 3 'outside'
     '''
     def __init__(self,shape=(64,64)):
-        self.chanmap = np.full(shape,np.uint8(-1),dtype=np.uint8)
-        self.sepflags = np.full(shape,np.uint8(-1),dtype=np.uint8)
+        self.chanmap = np.full(shape,0,dtype=np.uint8)
+        self.sepflags = np.full(shape,0,dtype=np.uint8)
         return None
 
     def __call__(self):
@@ -56,7 +55,6 @@ class BESmap():
         print('chanmap',self.chanmap)
         print('separatrix',self.sepflags)
         return None
-
 
 
 
