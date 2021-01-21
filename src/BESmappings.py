@@ -16,9 +16,12 @@ class BESmap():
         let's use 0s as no sensor so that we can easily incorporate sparse coo_matrix later
         Separatrix flag is 1 'inside', 2 'borderline', 3 'outside'
     '''
+
+    shotstring = 's142294'
+
     def __init__(self,shape=(64,64)):
-        self.chanmap = np.full(shape,np.uint8(-1),dtype=np.uint8)
-        self.sepflags = np.full(shape,np.uint8(-1),dtype=np.uint8)
+        self.chanmap = np.full(shape,np.uint8(0),dtype=np.uint8)
+        self.sepflags = np.full(shape,np.uint8(0),dtype=np.uint8)
         return None
 
     def __call__(self):
@@ -26,6 +29,13 @@ class BESmap():
         newmap.chanmap = self.chanmap.copy()
         newmap.sepflags = self.sepflags.copy()
         return newmap
+
+    def getshotstring(self):
+        return self.shotstring
+
+    def setshotstring(self,s):
+        self.shotstring = s
+        return self
 
     def getinds(self):
         return np.where(self.chanmap)
@@ -53,10 +63,9 @@ class BESmap():
         return self
         
     def print(self):
+        print('shotstring',self.shotstring)
         print('chanmap',self.chanmap)
         print('separatrix',self.sepflags)
         return None
-
-
 
 

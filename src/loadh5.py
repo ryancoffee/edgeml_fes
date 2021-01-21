@@ -7,6 +7,7 @@ import sys
 import re
 
 from BESmappings import BESmap
+from DaveConfigs import dealwithBESconfigs
 
 def blurTH(M,th=0.,center=0.,bwd0=.1,bwd1=1):
     x=np.linspace(-1*M.shape[1]/M.shape[0],1*M.shape[1]/M.shape[0],M.shape[1])
@@ -68,7 +69,7 @@ def separatedets(data):
 def main():
     if len(sys.argv)<2:
         print('syntax: loadh5.py <datafilename>')
-        test = BESmap()
+        test = dealwithBESconfigs('s142294') 
         test.setinds(4,4,63)
         test.setinds(5,7,31)
         print(test.getspmap())
