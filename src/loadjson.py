@@ -65,6 +65,7 @@ def separatedets(data):
 
 def main():
     if len(sys.argv)<2:
+        #files are in ./data/122117.json
         print('syntax: loadjason.py <datafilename>')
         return
     m = re.search('(.*)/(.*)\.json',sys.argv[1])
