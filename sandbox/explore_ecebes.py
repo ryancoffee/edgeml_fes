@@ -71,11 +71,13 @@ def main():
                 if data_ece[ch]['data.ECE'].shape[0]>1:
                     x = data_ece[ch]['data.ECE'][inds_ece_coince[0][:nsamples*nfolds]]
                     x = x.reshape(-1,1024).T
-                    #X = np.fft.fft(x,axis=0)
-                    xm = np.row_stack((x,np.flipud(x)))
-                    #cv.normalize(xm,xm,0,255,cv.NORM_MINMAX)
-                    Xdct = dct(xm,axis=0)
+                    X = np.fft.fft(x,axis=0)
+                    OUT = np.log(np.power(np.abs(X),int(2)))
+                    cv.normalize(OUT,OUT,0,255,cv.NORM_MINMAX)
+                    #xm = np.row_stack((x,np.flipud(x)))
+                    #Xdct = dct(xm,axis=0)
                     #grp_ece.create_dataset(m.group(1),data=bipolarlognorm(Xdct))
+                    grp_ece.create_dataset(m.group(1),data=OUT.astype(np.uint8))
                     print(ch,x.shape)
         '''
         print(chans_bes)
@@ -89,13 +91,20 @@ def main():
             if m:
                 print(m.group(1))
                 if (data_bes[ch]['data.BES'].shape[0]>1):
+                    ##################
+                    ###  use HERE from 
+                    ### freqdomainkurt
+                    ##################
                     x = data_bes[ch]['data.BES'][inds_bes_coince[0][:nsamples*nfolds*2:2]]
                     x = x.reshape(-1,1024).T
-                    #X = np.fft.fft(x,axis=0)
-                    xm = np.row_stack((x,np.flipud(x)))
-                    cv.normalize(xm,xm,0,255,cv.NORM_MINMAX)
-                    Xdct = dct(xm,axis=0)
+                    X = np.fft.fft(x,axis=0)
+                    OUT = np.log(np.power(np.abs(X),int(2)))
+                    cv.normalize(OUT,OUT,0,255,cv.NORM_MINMAX)
+                    #xm = np.row_stack((x,np.flipud(x)))
+                    #cv.normalize(xm,xm,0,255,cv.NORM_MINMAX)
+                    #Xdct = dct(xm,axis=0)
                     #grp_bes.create_dataset(m.group(1),data=bipolarlognorm(Xdct))
+                    grp_bes.create_dataset(m.group(1),data=OUT.astype(np.uint8))
                     print(ch,x.shape)
                 '''
                 else:

@@ -60,6 +60,9 @@ def main():
         detstrings = list(data.keys())
         imglist = []
         for det in range(len(detstrings)):
+            #####################
+            ####### HERE ########
+            #####################
             nrows = 256
             nsamples = 512*nrows
             if det == 2:
