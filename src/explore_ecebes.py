@@ -4,12 +4,32 @@ import numpy as np
 import h5py
 import sys
 import re
-import cv2 as cv
+import cv2
 from scipy.fftpack import dct,idct
 
-def getmask(shp):
-    mask = [np.zeros(shp,dtype = float) for k in range(4)]
-    MASK = [np.zeros(shp,dtype = complex) for k in range(4)]
+def tanh(x,w):
+    return 0.5*(1.+np.tanh(x/w))
+
+def relu(x):
+    return x * (x>0)
+
+def qfilt(shape,ilim):
+    mask = [np.zeros(shape,dtype=float) for k in range(3)]
+    MASK = [np.zeros(shape,dtype = complex) for k in range(3)]
+    ilim = int(5)
+    width = float(ilim)
+    x = np.tile(np.arange(5).astype(float)/width,(shape[1],1)).T
+    mask[0][:ilim,:] = 0.5*(1.+np.sin(x*np.pi))
+    mask[1][:ilim,:] = -np.cos(x*np.pi)*0.5*(1.+np.sin(x*np.pi))
+    mask[2][:ilim,:] = -np.cos(x*2*np.pi)*0.5*(1.+np.sin(x*np.pi))
+    for i in range(len(mask)):
+        mask[i] = np.roll(mask[i],-ilim//2,axis=0)
+        MASK[i] = np.fft.fft(mask[i],axis=0)
+    return mask,MASK
+
+def getmask(shape):
+    mask = [np.zeros(shape,dtype = float) for k in range(4)]
+    MASK = [np.zeros(shape,dtype = complex) for k in range(4)]
     mask[0][:3,1] = 1.
     mask[1][1,:3] = 1.
     mask[2][:3,:3] = np.eye(3)
@@ -93,7 +113,10 @@ def main():
         fitlim=int(8)
         hfit = np.array(hbins[1:fitlim])
         hfitmat = np.c_[[int(1) for i in range(fitlim-1)],hfit,hfit**2,hfit**3]
+
         mask,MASK = getmask((nsamples,nfolds))
+        qmask,QMASK = qfilt((nsamples,nfolds),5)
+
         for ch in chans_ece:
             m = re.search('^ece.{2}(\d+)$',ch)
             if m:
@@ -104,12 +127,12 @@ def main():
                     AX = np.abs(X)
                     if np.max(AX)==0:
                         continue
-                    OUT = np.log(np.power(AX,int(2)))
+                    OUT = np.log(AX)
                     BG = np.fft.ifft(np.fft.fft(OUT.copy(),axis=0) * buildfilt(nsamples,nfolds,cutoff=0.05) ,axis=0).real
                     OUT = OUT - BG
                     OUT[0,:] = 0
                     OUT -= np.mean(OUT)
-                    OUT *= fitlim/np.std(OUT)#*(OUT>hbins[0])
+                    OUT *= fitlim/np.std(OUT)
                     grp_ece.create_dataset(m.group(1),data=OUT[:nsamples//2,:].astype(np.int16))
                     if False:
                         # disabling the histogramming.
@@ -143,12 +166,27 @@ def main():
                         #enabling 3x3 conv kernel
                         # use a 3x3 kernel in pi radian rotation, max val, no pool.
                         QOUT = np.fft.fft2(OUT)
-                        NEWOUT = [np.zeros(QOUT.shape,dtype=float) for i in range(len(MASK))]
-                        for i in range(len(MASK)):
-                            NEWOUT[i] = np.fft.ifft2(QOUT*MASK[i]).real
-                        for i in range(len(MASK)):
-                            NEWOUT[0] = np.where(NEWOUT[i]>NEWOUT[0],NEWOUT[i],NEWOUT[0])
-                        grp_ece.create_dataset('%s_filt'%(m.group(1)),data=NEWOUT[0][:nsamples//2,:].astype(np.int16))
+                        #NEWOUT = [np.zeros(QOUT.shape,dtype=float) for i in range(len(MASK))]
+                        NEWOUT = np.zeros((QOUT.shape[0],QOUT.shape[1],len(MASK)),dtype=float)
+                        for i in range(NEWOUT.shape[2]):
+                            NEWOUT[:,:,i] = np.fft.ifft2(QOUT*MASK[i]).real
+                        grp_ece.create_dataset('%s_filt'%(m.group(1)),data=NEWOUT[:nsamples//2,:,:].astype(np.int16))
+                    if False:
+                        # write out a tanh(of the unfiltered pixel values)
+                        grp_ece.create_dataset('%s_tanh'%(m.group(1)),data=(128*tanh(OUT[:nsamples//2,:],5)).astype(np.int16))
+                    if False:
+                        grp_ece.create_dataset('%s_relu'%(m.group(1)),data=(relu(OUT[:nsamples//2,:])).astype(np.int16))
+
+                    if True:
+                        logout = np.log(OUT*(OUT>0) + 1)
+                        logout -= np.median(logout)
+                        logout *= (logout>0)
+                        logout = logout *256./np.max(logout)
+                        QOUT = np.fft.fft2(logout)
+                        NEWOUT = np.zeros((QOUT.shape[0],QOUT.shape[1],len(MASK)),dtype=float)
+                        for i in range(NEWOUT.shape[2]):
+                            NEWOUT[:,:,i] = 0.333*np.fft.ifft2(QOUT*MASK[i]).real
+                        grp_ece.create_dataset('%s_filtlog'%(m.group(1)),data=(NEWOUT[:nsamples//2,:,:]).astype(np.int16))
 
                     print(ch,x.shape)
         '''
