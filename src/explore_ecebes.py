@@ -31,8 +31,8 @@ def getmask(shape):
     mask = [np.zeros(shape,dtype = float) for k in range(4)]
     MASK = [np.zeros(shape,dtype = complex) for k in range(4)]
     mask[0][:3,1] = 1.
-    mask[1][1,:3] = 1.
-    mask[2][:3,:3] = np.eye(3)
+    mask[1][:3,:3] = np.eye(3)
+    mask[2][1,:3] = 1.
     mask[3][:3,:3] = np.fliplr(np.eye(3))
     for i in range(len(mask)):
         mask[i] = np.roll(np.roll(mask[i],-1,axis=0),-1,axis=1)
