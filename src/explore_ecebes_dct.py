@@ -164,12 +164,12 @@ def main():
         #mask,MASK = getmask_deep((nsamples,nfolds))
         filt = buildfilt(nsamples,nfolds,cutoff=.10)# by inspection this looks good for BG subtraction on ECE images
         dct_filt2d = dct_buildfilt2d((nsamples,nfolds*2),cutoffs=(nsamples//16,nfolds//4)) # remember, we need to mirror the nfolds dimension, thus the *2
-        dct_filt = dct_buildfilt((nsamples,nfolds),cutoff=2) # remember, we need to mirror the nfolds dimension, thus the *2
+        dct_filt = dct_buildfilt((nsamples,nfolds),cutoff=64) # remember, we need to mirror the nfolds dimension, thus the *2
 
         for ch in chans_ece:
             m = re.search('^ece.{2}(\d+)$',ch)
             if m:
-                print(m.group(1))
+                print('%s\t%s\t%ix%i'%(m.group(0),m.group(1),nsamples,nfolds))
                 if data_ece[ch]['data.ECE'].shape[0]>1:
                     x = data_ece[ch]['data.ECE'][inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
                     X = np.fft.fft(x,axis=0) #np.row_stack((x,np.flipud(x))),axis=0)
@@ -178,80 +178,66 @@ def main():
                     if np.max(AX)==0:
                         continue
                     OUT = np.log2(AX+1)
-                    #CPHASE = (np.cos(PX) + 1)*2**14
-                    #SPHASE = (np.sin(PX) + 1)*2**14
                     BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt,axis = 0)
-                    #BG = np.fft.ifft(np.fft.fft(OUT,axis=0) * filt ,axis=0).real
-                    #OUT = OUT - BG
+                    OUT -= BG
                     OUT[0,:] = 0
                     OUT *= (OUT>0)
-                    OUT *= 2**14/np.max(OUT)
-                    grp_ece.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:nfolds].astype(np.int16))
-                    #grp_ece.create_dataset('%s_cosphase'%m.group(1),data=CPHASE[:nsamples,:nfolds].astype(np.int16))
-                    #grp_ece.create_dataset('%s_sinphase'%m.group(1),data=SPHASE[:nsamples,:nfolds].astype(np.int16))
-                    cv2.imwrite('./figs/gray/logabs_shot%i_ch%s.png'%(shot,m.group(1)),(OUT//2**6).astype(np.uint8))
-                    #cv2.imwrite('./figs/gray/cphase_shot%i_ch%s.png'%(shot,m.group(1)),(CPHASE//2**6).astype(np.uint8))
-                    #cv2.imwrite('./figs/gray/sphase_shot%i_ch%s.png'%(shot,m.group(1)),(SPHASE//2**6).astype(np.uint8))
+                    OUT *= (2**16-1)/np.max(OUT)
+                    grp_ece.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:nfolds].astype(np.uint16))
+                    cv2.imwrite('./figs/gray/logabs_ece_shot%i_ch%s.png'%(shot,m.group(1)),(OUT[:,:2*(OUT.shape[1]//2)] //2**8).astype(np.uint8))
 
                     '''
                     OK, the powerspectrum here is necessarily symmetric in axis0, and the phase is neccesarily anti-symmetric.
                     We should be able to use the discrete cosine and sine transforms.
                     '''
                     if True:
-                        #logout = np.log2(OUT*(OUT>0) + 1)
-                        #logout -= np.min(logout)
-                        #logout *= (logout>0)
-                        #logout = logout * 2**14/np.max(logout)
-                        ########### HERE begin converting to dct/dst
-                        #DCOUT = fft.dct2(np.column_stack((logout,np.flip(logout,axis=1))))
-                        #DCOUT = np.fft.fft2(logout)
-                        DCOUT = np.fft.fft2(OUT)
-                        NEWOUT = np.zeros((DCOUT.shape[0],DCOUT.shape[1],len(MASK)),dtype=float)
-                        #NEWOUT[:,:,0] = CPHASE
-                        #NEWOUT[:,:,0] = SPHASE 
+                        DFTOUT = np.fft.fft2(OUT)
+                        NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=float)
                         for i in range(len(MASK)):
-                            NEWOUT[:,:,i] = np.fft.ifft2(DCOUT*MASK[i]).real
-                            #NEWOUT[:,:,i] = fft.idctn(DCOUT*MASK[i],axes=(0,1))
-                        grp_ece.create_dataset('%s_filtlog'%(m.group(1)),data=(NEWOUT[:nsamples//2,:,:]).astype(np.int16))
-                        cv2.imwrite('./figs/color/shot%i_ch%s_color1.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,:3])
-                        cv2.imwrite('./figs/color/shot%i_ch%s_color2.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,3:])
-                        '''
-                        if m.group(1)=='20':
-                            mx = np.max(OUT[:nsamples,:])
-                            OUT *= 1./mx
-                            #cv2.imshow('ch20 ece img',OUT[:nsamples,:].astype(np.uint16))
-                            cv2.imshow('ch20 ece img',NEWOUT[:nsamples,:,:].astype(float))
-                            cv2.waitKey(0)
-                            cv2.destroyAllWindows()
-                        '''
+                            NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*MASK[i]).real
+                        NEWOUT *= (NEWOUT>0)
+                        grp_ece.create_dataset('%s_directional'%(m.group(1)),data=(NEWOUT[:nsamples//2,:,:]).astype(np.int16))
+                        cv2.imwrite('./figs/color/ece_shot%i_ch%s_color1.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,:3])
+                        cv2.imwrite('./figs/color/ece_shot%i_ch%s_color2.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,3:])
 
-                    print(ch,x.shape)
         '''
         print(chans_bes)
         print(chans_bes[-2],(data_bes[chans_bes[-1]]))
         print(chans_bes[-1],(data_bes[chans_bes[-1]]))
         '''
-
-        '''
+        #dct_filt_bes = dct_buildfilt((nsamples,nfolds),cutoff=2) # remember, we need to mirror the nfolds dimension, thus the *2
         grp_bes = f.create_group('bes')
         for ch in chans_bes:
             #if ((type(data_bes[ch]['data.BES'])!=type(None))):# and 
             m = re.search('^bes.{2}(\d+)',ch)
             if m:
-                print(m.group(1))
+                print('%s\t%s\t%ix%i'%(m.group(0),m.group(1),nsamples,nfolds))
                 if (data_bes[ch]['data.BES'].shape[0]>1):
                     x = data_bes[ch]['data.BES'][inds_bes_coince[0][:nsamples*nfolds*2:2]].reshape(nfolds,nsamples).T
                     X = np.fft.fft(x,axis=0)
-                    OUT = np.log(np.power(np.abs(X),int(2)))
-                    BG = np.fft.ifft(np.fft.fft(OUT.copy(),axis=0) * buildfilt(nsamples,nfolds,cutoff=0.05) ,axis=0).real
-                    OUT = OUT - BG
-                    OUT -= np.mean(OUT)
-                    OUT *= 8/np.std(OUT)
-                    #cv.normalize(OUT-BG,OUT,0,255,cv.NORM_MINMAX)
-                    grp_bes.create_dataset(m.group(1),data=OUT[:nsamples//2,:].astype(np.int8))
-                    print(ch,x.shape)
+                    AX = np.abs(X)
+                    #PX = np.angle(X)
+                    if np.max(AX)==0:
+                        continue
+                    OUT = np.log2(AX+1)
+                    #BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt_bes ,axis=0)
+                    #OUT -= BG
+                    OUT[:2,:] = 0
+                    OUT[-2:,:] = 0
+                    OUT *= (2**16-1)/np.max(OUT)
+                    grp_bes.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:].astype(np.uint16))
+                    cv2.imwrite('./figs/gray/logabs_bes_shot%i_ch%s.png'%(shot,m.group(1)),(OUT//2**8).astype(np.uint8))
 
-        '''
+                    if True:
+                        DFTOUT = np.fft.fft2(OUT)
+                        NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=float)
+                        for i in range(len(MASK)):
+                            NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*MASK[i]).real
+                        NEWOUT *= (NEWOUT>0)
+                        grp_bes.create_dataset('%s_directional'%(m.group(1)),data=(NEWOUT[:nsamples//2,:,:]).astype(np.uint16))
+                        cv2.imwrite('./figs/color/bes_shot%i_ch%s_color1.png'%(shot,m.group(1)),(NEWOUT//2**9).astype(np.uint8)[:,:,[0,1,2]])
+                        cv2.imwrite('./figs/color/bes_shot%i_ch%s_color2.png'%(shot,m.group(1)),(NEWOUT//2**9).astype(np.uint8)[:,:,[2,3,3]])
+
         #closing with h5py.File() as f
     
     return
