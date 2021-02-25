@@ -5,7 +5,7 @@ import h5py
 import sys
 import re
 import cv2
-from scipy.fftpack import dct,idct
+from scipy import fft,stats
 
 def tanh(x,w):
     return 0.5*(1.+np.tanh(x/w))
@@ -27,6 +27,38 @@ def qfilt(shape,ilim):
         MASK[i] = np.fft.fft(mask[i],axis=0)
     return mask,MASK
 
+'''
+def dct_mask(shape,lims):
+    mask = [np.zeros(shape,dtype=float) for k in range(3)]
+    XX = np.tile(np.arange(lims[0]),(lims[1],1)).T
+    YY = np.tile(np.arange(lims[1]),(lims[0],1))
+
+
+    mask[:]
+
+    return mask,MASK
+'''
+
+
+def getmask_deep(shape):
+    mask = [np.zeros(shape,dtype = float) for k in range(12)]
+    MASK = [np.zeros(shape,dtype = complex) for k in range(12)]
+    mask[0][:3,0::2] = 0.333
+    x=np.eye(3,3)
+    xu = np.triu(np.roll(x,-1,axis=0))
+    xu += np.flip(np.flip(xu,axis=0),axis=1)
+    mask[1][:3,:3] =0.333*xu.copy()
+    mask[2][0:2,:] = .333
+    mask[3][:3,:3] = 0.333*xu.T.copy()
+    mask[4][:3,0::2] = -0.666
+    mask[5][:3,:3] = -.666*xu.copy()
+    mask[6][0::2,:3] = -0.666
+    mask[7][:3,:3] = -.666*xu.T.copy()
+    for i in range(len(mask)):
+        mask[i] = np.roll(np.roll(mask[i],-1,axis=0),-1,axis=1)
+        MASK[i] = np.fft.fft2(mask[i])
+    return mask,MASK
+
 def getmask(shape):
     mask = [np.zeros(shape,dtype = float) for k in range(4)]
     MASK = [np.zeros(shape,dtype = complex) for k in range(4)]
@@ -45,10 +77,17 @@ def dct_deriv_buildfilt(nsamples,nrolls,cutoff=256):
     filt[:int(cutoff)] = FREQ[int(cutoff)]*(1.+np.cos(np.pi*FREQ[:int(cutoff)]/float(cutoff)))
     return np.tile(filt,(nrolls,1)).T
 
-def dct_buildfilt(nsamples,nrolls,cutoff=256):
-    filt = np.zeros(nsamples,dtype=float)
-    filt[:int(cutoff)] = 0.5*(1.+np.cos(np.pi*FREQ[:int(cutoff)]/float(cutoff)))
-    return np.tile(filt,(nrolls,1)).T
+def dct_buildfilt2d(shp,cutoffs=(256,512)):
+    filt = np.zeros(shp,dtype=float)
+    XX=np.tile(np.arange(cutoffs[0]),(cutoffs[1],1)).T
+    YY=np.tile(np.arange(cutoffs[1]),(cutoffs[0],1))
+    filt[:cutoffs[0],:cutoffs[1]] = 0.25*(2. + np.cos(np.pi*XX/float(cutoffs[0])) + np.cos(np.pi*YY/float(cutoffs[1])))
+    return filt
+
+def dct_buildfilt(shape,cutoff=256):
+    filt = np.zeros(shape[0],dtype=float)
+    filt[:int(cutoff)] = 0.5*(1.+np.cos(np.pi*np.arange(int(cutoff),dtype=float)/float(cutoff)))
+    return np.tile(filt,(shape[1],1)).T
 
 def buildfilt(nsamples,nrolls,cutoff=0.01):
     FREQ = np.fft.fftfreq(nsamples)
@@ -97,7 +136,7 @@ def main():
         print('syntax: %s <path/filehead'%sys.argv[0])
     ecefile = '%s/%i%s'%(path,shot,'ECE')
     besfile = '%s/%i%s'%(path,shot,'BES')
-    outfile = './data/%s.h5'%(shot)
+    outfile = './data/%s_dct.h5'%(shot)
 
     with h5py.File(outfile,'w') as f:
         data_ece = np.load(ecefile,allow_pickle=True)
@@ -120,14 +159,12 @@ def main():
         f.create_dataset('times',data=t)
         grp_ece = f.create_group('ece')
 
-        hbins = [i for i in range(256+1)]
-        fitlim=int(8)
-        hfit = np.array(hbins[1:fitlim])
-        hfitmat = np.c_[[int(1) for i in range(fitlim-1)],hfit,hfit**2,hfit**3]
 
         mask,MASK = getmask((nsamples,nfolds))
-        qmask,QMASK = qfilt((nsamples,nfolds),5)
-        filt = buildfilt(nsamples,nfolds,cutoff=0.1) ,axis=0).real
+        #mask,MASK = getmask_deep((nsamples,nfolds))
+        filt = buildfilt(nsamples,nfolds,cutoff=.10)# by inspection this looks good for BG subtraction on ECE images
+        dct_filt2d = dct_buildfilt2d((nsamples,nfolds*2),cutoffs=(nsamples//16,nfolds//4)) # remember, we need to mirror the nfolds dimension, thus the *2
+        dct_filt = dct_buildfilt((nsamples,nfolds),cutoff=2) # remember, we need to mirror the nfolds dimension, thus the *2
 
         for ch in chans_ece:
             m = re.search('^ece.{2}(\d+)$',ch)
@@ -135,71 +172,58 @@ def main():
                 print(m.group(1))
                 if data_ece[ch]['data.ECE'].shape[0]>1:
                     x = data_ece[ch]['data.ECE'][inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
-                    X = np.fft.fft(x,axis=0)
+                    X = np.fft.fft(x,axis=0) #np.row_stack((x,np.flipud(x))),axis=0)
                     AX = np.abs(X)
+                    #PX = np.angle(X)
                     if np.max(AX)==0:
                         continue
-                    OUT = np.log(AX)
-                    BG = np.fft.ifft(np.fft.fft(OUT.copy(),axis=0) * filt ,axis=0).real
-                    OUT = OUT - BG
+                    OUT = np.log2(AX+1)
+                    #CPHASE = (np.cos(PX) + 1)*2**14
+                    #SPHASE = (np.sin(PX) + 1)*2**14
+                    BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt,axis = 0)
+                    #BG = np.fft.ifft(np.fft.fft(OUT,axis=0) * filt ,axis=0).real
+                    #OUT = OUT - BG
                     OUT[0,:] = 0
-                    OUT -= np.mean(OUT)
-                    OUT *= fitlim/np.std(OUT)
-                    grp_ece.create_dataset(m.group(1),data=OUT[:nsamples//2,:].astype(np.int16))
-                    if False:
-                        # disabling the histogramming.
-    
-                        '''
-                        f(x) = [1,x,x**2,x**3].dot(theta)
-                        OK, take the histogram of values (after this mean 0 std 8)... this seems to place modes in example shot at about 80-90 )
-                        Take the log of the histogram of values, fit f(x) (zeros centered), to a cubic poly from -1..8 (using peudo inverse method)
-                        2 step Newton-Raphson with +8 as initial guess to find root (this is all so far in log space)
-                        Find the max of values above the root, call it p
-                        scale envelope is defined like Weiner as 1/(1+ exp( f(x) )/exp(p) )
-                        '''
-                        h = np.log(1+np.histogram(OUT,hbins)[0])
-                        theta = np.linalg.pinv(hfitmat).dot(h[1:fitlim])
-                        pows = np.arange(4,dtype=int)
-                        fx = np.array([np.power(np.full(pows.shape,v),pows).dot(theta) for v in OUT.flatten()]).reshape(OUT.shape) # fitted value for each pixel val
-                        '''
-                        cutoff = findroot(theta,fitlim+4) # using f(x) to find root using the guess of fitlim as initializer, only two step Newton-Raphson
-                        if (cutoff>1) and (cutoff < hbins[-1]):
-                            inds = np.where(hbins[:-1]>cutoff)
-                            p = np.max(h[inds])
-                            print(theta,cutoff,p)
-                            OUTFILT = OUT * 1./(1+np.exp(fx) / np.exp(p))
-                            #cv.normalize(OUT-BG,OUT,0,255,cv.NORM_MINMAX)
-                        '''
-                        p = h[fitlim]
-                        OUTFILT = OUT * 1./(1+np.exp(fx) / np.exp(p))
-                        grp_ece.create_dataset('%s_filt'%(m.group(1)),data=OUTFILT[:nsamples//2,:].astype(np.uint8))
+                    OUT *= (OUT>0)
+                    OUT *= 2**14/np.max(OUT)
+                    grp_ece.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:nfolds].astype(np.int16))
+                    #grp_ece.create_dataset('%s_cosphase'%m.group(1),data=CPHASE[:nsamples,:nfolds].astype(np.int16))
+                    #grp_ece.create_dataset('%s_sinphase'%m.group(1),data=SPHASE[:nsamples,:nfolds].astype(np.int16))
+                    cv2.imwrite('./figs/gray/logabs_shot%i_ch%s.png'%(shot,m.group(1)),(OUT//2**6).astype(np.uint8))
+                    #cv2.imwrite('./figs/gray/cphase_shot%i_ch%s.png'%(shot,m.group(1)),(CPHASE//2**6).astype(np.uint8))
+                    #cv2.imwrite('./figs/gray/sphase_shot%i_ch%s.png'%(shot,m.group(1)),(SPHASE//2**6).astype(np.uint8))
 
+                    '''
+                    OK, the powerspectrum here is necessarily symmetric in axis0, and the phase is neccesarily anti-symmetric.
+                    We should be able to use the discrete cosine and sine transforms.
+                    '''
                     if True:
-                        #enabling 3x3 conv kernel
-                        # use a 3x3 kernel in pi radian rotation, max val, no pool.
-                        QOUT = np.fft.fft2(OUT)
-                        #NEWOUT = [np.zeros(QOUT.shape,dtype=float) for i in range(len(MASK))]
-                        NEWOUT = np.zeros((QOUT.shape[0],QOUT.shape[1],len(MASK)),dtype=float)
-                        for i in range(NEWOUT.shape[2]):
-                            NEWOUT[:,:,i] = np.fft.ifft2(QOUT*MASK[i]).real
-                        grp_ece.create_dataset('%s_filt'%(m.group(1)),data=NEWOUT[:nsamples//2,:,:].astype(np.int16))
-                    if False:
-                        # write out a tanh(of the unfiltered pixel values)
-                        grp_ece.create_dataset('%s_tanh'%(m.group(1)),data=(128*tanh(OUT[:nsamples//2,:],5)).astype(np.int16))
-                    if False:
-                        grp_ece.create_dataset('%s_relu'%(m.group(1)),data=(relu(OUT[:nsamples//2,:])).astype(np.int16))
-
-                    if True:
-                        logout = np.log(OUT*(OUT>0) + 1)
-                        logout -= np.median(logout)
-                        logout *= (logout>0)
-                        logout = logout *256./np.max(logout)
-                        QOUT = np.fft.fft2(logout)
-                        NEWOUT = np.zeros((QOUT.shape[0],QOUT.shape[1],len(MASK)),dtype=float)
-                        for i in range(NEWOUT.shape[2]):
-                            NEWOUT[:,:,i] = 0.333*np.fft.ifft2(QOUT*MASK[i]).real
+                        #logout = np.log2(OUT*(OUT>0) + 1)
+                        #logout -= np.min(logout)
+                        #logout *= (logout>0)
+                        #logout = logout * 2**14/np.max(logout)
+                        ########### HERE begin converting to dct/dst
+                        #DCOUT = fft.dct2(np.column_stack((logout,np.flip(logout,axis=1))))
+                        #DCOUT = np.fft.fft2(logout)
+                        DCOUT = np.fft.fft2(OUT)
+                        NEWOUT = np.zeros((DCOUT.shape[0],DCOUT.shape[1],len(MASK)),dtype=float)
+                        #NEWOUT[:,:,0] = CPHASE
+                        #NEWOUT[:,:,0] = SPHASE 
+                        for i in range(len(MASK)):
+                            NEWOUT[:,:,i] = np.fft.ifft2(DCOUT*MASK[i]).real
+                            #NEWOUT[:,:,i] = fft.idctn(DCOUT*MASK[i],axes=(0,1))
                         grp_ece.create_dataset('%s_filtlog'%(m.group(1)),data=(NEWOUT[:nsamples//2,:,:]).astype(np.int16))
-                        cv2.imwrite('dft_shot%i_ch%s_color.png'%(shot,m.group(1)),NEWOUT.astype(np.uint8)[:nsamples//2,:,:3])
+                        cv2.imwrite('./figs/color/shot%i_ch%s_color1.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,:3])
+                        cv2.imwrite('./figs/color/shot%i_ch%s_color2.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,3:])
+                        '''
+                        if m.group(1)=='20':
+                            mx = np.max(OUT[:nsamples,:])
+                            OUT *= 1./mx
+                            #cv2.imshow('ch20 ece img',OUT[:nsamples,:].astype(np.uint16))
+                            cv2.imshow('ch20 ece img',NEWOUT[:nsamples,:,:].astype(float))
+                            cv2.waitKey(0)
+                            cv2.destroyAllWindows()
+                        '''
 
                     print(ch,x.shape)
         '''
