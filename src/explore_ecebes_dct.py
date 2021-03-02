@@ -74,9 +74,14 @@ def getmask(shape):
 def dct_deriv_buildfilt(shape,cut=(0,256)):
     cuton = cut[0]
     cutoff = cut[1]
-    FREQ = np.arange(shape[0],dtype=float)
-    filt = np.zeros(FREQ.shape[0],dtype=float)
-    filt[cuton:cutoff] = FREQ[cuton:cutoff]*(1.+np.sin(np.pi*(FREQ[cuton:cutoff]-FREQ[cuton])/float(cutoff-cuton)))
+    filt = np.zeros(shape[0],dtype=float)
+    if cut[0] > 0:
+        cuton = cut[0]
+        FREQ = np.arange(int(cuton),int(cutoff))
+        filt[int(cuton):int(cutoff)] = FREQ*0.5*(1.+np.sin(np.pi*np.arange(int(cutoff-cuton))/float(cutoff-cuton)))
+    else:
+        FREQ = np.arange(int(cutoff))
+        filt[:int(cutoff)] = FREQ*0.5*(1.+np.cos(np.pi*FREQ/float(cutoff)))
     return np.tile(filt,(shape[1],1)).T
 
 def dct_buildfilt2d(shp,cutoffs=(256,512)):
@@ -86,9 +91,15 @@ def dct_buildfilt2d(shp,cutoffs=(256,512)):
     filt[:cutoffs[0],:cutoffs[1]] = 0.25*(2. + np.cos(np.pi*XX/float(cutoffs[0])) + np.cos(np.pi*YY/float(cutoffs[1])))
     return filt
 
-def dct_buildfilt(shape,cutoff=256):
+def dct_buildfilt(shape,cut=(0,256)):
+    cutoff = cut[1]
     filt = np.zeros(shape[0],dtype=float)
-    filt[:int(cutoff)] = 0.5*(1.+np.cos(np.pi*np.arange(int(cutoff),dtype=float)/float(cutoff)))
+    FREQ = np.arange(int(cutoff),dtype=float)
+    if cut[0] > 0:
+        cuton = cut[0]
+        filt[int(cuton):int(cutoff)] = 0.5*(1.+np.sin(np.pi*np.arange(int(cutoff-cuton))/float(cutoff-cuton)))
+    else:
+        filt[:int(cutoff)] = 0.5*(1.+np.cos(np.pi*FREQ/float(cutoff)))
     return np.tile(filt,(shape[1],1)).T
 
 def buildfilt(nsamples,nrolls,cutoff=0.01):
@@ -167,7 +178,9 @@ def main():
         #mask,MASK = getmask_deep((nsamples,nfolds))
         filt = buildfilt(nsamples,nfolds,cutoff=.10)# by inspection this looks good for BG subtraction on ECE images
         dct_filt2d = dct_buildfilt2d((nsamples,nfolds*2),cutoffs=(nsamples//16,nfolds//4)) # remember, we need to mirror the nfolds dimension, thus the *2
-        dct_filt = dct_buildfilt((nsamples,nfolds),cutoff=64) # remember, we need to mirror the nfolds dimension, thus the *2
+        dct_filt = dct_buildfilt((nsamples,nfolds),cut=(0,64)) # remember, we need to mirror the nfolds dimension, thus the *2
+        dct_filt_ecederiv = dct_deriv_buildfilt((nsamples,nfolds),cut=(8,3*nsamples//4)) 
+        dct_filt_ece = dct_buildfilt((nsamples,nfolds),cut=(8,nsamples//4)) 
 
         for ch in chans_ece[0]:
             m = re.search('^ece.{2}(\d+)$',ch)
@@ -175,9 +188,10 @@ def main():
                 print('%s\t%s\t%ix%i'%(m.group(0),m.group(1),nsamples,nfolds))
                 if data_ece[ch]['data.ECE'].shape[0]>1:
                     x = data_ece[ch]['data.ECE'][inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
-                    X = np.fft.fft(x,axis=0) #np.row_stack((x,np.flipud(x))),axis=0)
-                    AX = np.abs(X)
-                    #PX = np.angle(X)
+                    #X = np.fft.fft(x,axis=0) #np.row_stack((x,np.flipud(x))),axis=0)
+                    xx = np.row_stack((x,np.flip(x,axis=0)))
+                    X = fft.dct(xx,axis=0)
+                    AX = np.abs(X[::2,:])
                     if np.max(AX)==0:
                         continue
                     OUT = np.log2(AX+1)
@@ -185,15 +199,23 @@ def main():
                     OUT -= BG
                     OUT[0,:] = 0
                     OUT *= (OUT>0)
+
+                    DOUT = fft.idct(fft.dct(OUT,axis=0)*dct_filt_ecederiv,axis=0)
+                    DOUT -= np.min(DOUT)
+                    DOUT *= (2**16-1)/np.max(DOUT)
+
                     OUT *= (2**16-1)/np.max(OUT)
                     grp_ece.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:nfolds].astype(np.uint16))
-                    cv2.imwrite('./figs/gray/ece/shot%i/logabs_ece_shot%i_ch%s.png'%(shot,shot,m.group(1)),(255-OUT[:,:2*(OUT.shape[1]//2)] //2**6).astype(np.uint8))
+                    grp_ece.create_dataset('%s_logabsfilt'%m.group(1),data=DOUT[:nsamples,:nfolds].astype(np.uint16))
+                    cv2.imwrite('./figs/gray/ece/shot%i/logabs_ece_shot%i_ch%s.png'%(shot,shot,m.group(1)),(255-OUT[:,:2*(OUT.shape[1]//2)]//2**8).astype(np.uint8))
+                    cv2.imwrite('./figs/gray/ece/shot%i/logabsfilt_ece_shot%i_ch%s.png'%(shot,shot,m.group(1)),(255-DOUT//2**8).astype(np.uint8))
 
                     '''
                     OK, the powerspectrum here is necessarily symmetric in axis0, and the phase is neccesarily anti-symmetric.
                     We should be able to use the discrete cosine and sine transforms.
                     '''
-                    if True:
+
+                    if False:
                         DFTOUT = np.fft.fft2(OUT)
                         NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=float)
                         for i in range(len(MASK)):
@@ -203,13 +225,6 @@ def main():
                         cv2.imwrite('./figs/color/ece_shot%i_ch%s_color1.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,:3])
                         cv2.imwrite('./figs/color/ece_shot%i_ch%s_color2.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,3:])
 
-        '''
-        print(chans_bes)
-        print(chans_bes[-2],(data_bes[chans_bes[-1]]))
-        print(chans_bes[-1],(data_bes[chans_bes[-1]]))
-        '''
-
-        #nsamples = int(sz_bes//nfolds)
         nsamples *= 2
         print('BES nfolds*nsamples = ',nfolds*nsamples)
         t = t_bes[inds_bes_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
@@ -217,6 +232,8 @@ def main():
 
         dct_filt_ELMrecover = dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples//4)) 
         dct_filt_ELMpop = dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples)) 
+        dct_filt_besderiv = dct_deriv_buildfilt((nsamples,nfolds),cut=(0,3*nsamples//4)) 
+        dct_filt_besdderiv = dct_deriv_buildfilt((nsamples,nfolds),cut=(1,3*nsamples//4)) 
 
         grp_bes = f.create_group('bes')
         for ch in chans_bes:
@@ -228,31 +245,47 @@ def main():
                     xx = np.row_stack((x,np.flip(x,axis=0)))
                     #X = np.fft.fft(x,axis=0)
                     X = fft.dct(xx,axis=0)
-                    elmrec = fft.idst(X*dct_filt_ELMrecover,axis=0)
-                    elmpop = fft.idst(X*dct_filt_ELMpop,axis=0) 
-                    elmrec -= np.min(elmrec)
-                    elmrec *= (2**16-1)/np.max(elmrec)
-                    elmpop -= np.min(elmpop)
-                    elmpop *= (2**16-1)/np.max(elmpop)
+                    elmrec = -fft.idst(X*dct_filt_ELMrecover,axis=0)
+                    elmpop = -fft.idst(X*dct_filt_ELMpop,axis=0) 
+                    elmrec -= np.mean(elmrec)
+                    elmrec *= (2**15-1)/np.max(np.abs(elmrec))
 
-                    AX = np.abs(X)
+                    elmpop -= np.mean(elmpop)
+                    elmpop *= (2**15-1)/np.max(np.abs(elmpop))
+
+                    AX = np.abs(X)[::2,:]
                     #PX = np.angle(X)
                     if np.max(AX)==0:
                         continue
                     OUT = np.log2(AX+1)
+
+                    DOUT = fft.idct(fft.dct(OUT,axis=0)*dct_filt_besderiv,axis=0)
+                    DOUT -= np.mean(DOUT)
+                    DOUT *= (2**16-1)/np.max(DOUT)*(DOUT>0)
+                    '''DOUTp = np.log2(1 + DOUT*(DOUT>1))
+                    DOUTp *= (2**16-1)/np.max(DOUTp)
+                    DOUTm = np.log2(1 - DOUT*(DOUT<-1))
+                    DOUTm *= (2**16-1)/np.max(DOUTm)
+                    DOUT = DOUTp - DOUTm + 2**15
+                    '''
+
                     ### BG subtraction doesn't work for BES since ELM pops would then be excluded
                     #BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt_bes ,axis=0)
                     #OUT -= BG
-                    OUT[:2,:] = 0
-                    OUT[-2:,:] = 0
-                    OUT *= (2**16-1)/np.max(OUT)
+                    OUT *= (2**16-1)/np.max(OUT[3:-2,:])
                     grp_bes.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:].astype(np.uint16))
+                    grp_bes.create_dataset('%s_logabsfilt'%m.group(1),data=DOUT[:nsamples,:].astype(np.uint16))
                     grp_bes.create_dataset('%s_elmpop'%m.group(1),data=elmpop[:nsamples,:].astype(np.uint16))
                     grp_bes.create_dataset('%s_elmrec'%m.group(1),data=elmrec[:nsamples,:].astype(np.uint16))
+                    imout = np.full((nsamples,nfolds,3),128,dtype=np.uint8)
+                    imout[:,:,2] = np.flip(elmpop[:nsamples,:]//2**8+128,axis=0).astype(np.uint8)
+                    imout[:,:,1] = np.flip(elmpop[:nsamples,:]//2**8+128,axis=0).astype(np.uint8)
+                    imout[:,:,0] = np.flip(elmrec[:nsamples,:]//2**8+128,axis=0).astype(np.uint8)
+
                     #cv2.imwrite('./figs/gray/bes/shot%i/logabs_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),(255-OUT[:,:2*(OUT.shape[1]//2)]//2**7).astype(np.uint8))
-                    cv2.imwrite('./figs/gray/bes/shot%i/logabs_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(255-OUT[::2,:]//2**7,axis=0).astype(np.uint8))
-                    cv2.imwrite('./figs/gray/bes/shot%i/elmpop_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(255-elmpop[:nsamples,:]//2**8,axis=0).astype(np.uint8))
-                    cv2.imwrite('./figs/gray/bes/shot%i/elmrec_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(255-elmrec[:nsamples,:]//2**8,axis=0).astype(np.uint8))
+                    cv2.imwrite('./figs/gray/bes/shot%i/logabs_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(255-OUT[::2,:]//2**8,axis=0).astype(np.uint8))
+                    cv2.imwrite('./figs/gray/bes/shot%i/logabsfilt_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(255-DOUT[::2,:]//2**8,axis=0).astype(np.uint8))
+                    cv2.imwrite('./figs/color/bes/shot%i/elm_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),imout)
                     x -= np.min(x)
                     x *= 255/np.max(x)
                     cv2.imwrite('./figs/gray/bes/shot%i/straight_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(x[:nsamples,:],axis=0).astype(np.uint8))
@@ -267,68 +300,6 @@ def main():
                         cv2.imwrite('./figs/color/bes_shot%i_ch%s_color1.png'%(shot,m.group(1)),(255-NEWOUT//2**9).astype(np.uint8)[:,:,[0,1,2]])
                         cv2.imwrite('./figs/color/bes_shot%i_ch%s_color2.png'%(shot,m.group(1)),(255-NEWOUT//2**9).astype(np.uint8)[:,:,[2,3,3]])
 
-        '''
-        Short draw for high pass ELM filtering
-        '''
-        nsamples = 32
-        nfolds = int(sz_bes//nsamples)
-        cutoff = 16
-        dct_finefilt = dct_buildfilt((nsamples*2,nfolds),cutoff=cutoff)
-        thresh = 1
-        for ch in chans_bes[0]:
-            #if ((type(data_bes[ch]['data.BES'])!=type(None))):# and 
-            m = re.search('^bes.{2}(\d+)',ch)
-            if m:
-                print('%s\t%s\t%ix%i'%(m.group(0),m.group(1),nsamples,nfolds))
-                if (data_bes[ch]['data.BES'].shape[0]>1):
-                    ## Now working on fine time resolution (wide frequency) since ELMs "pop" and then "deplete" and then "recover" all within a single millisecond
-                    #total = nsamples*nfolds*2
-                    #nsamples = 64
-                    #nfolds = (total//nsamples//2)*2
-                    x = data_bes[ch]['data.BES'][inds_bes_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
-                    X = np.row_stack((x,np.flip(x,axis=0)))
-                    np.savetxt('./figs/gray/bes/shot%i/signal_fine_bes_shot%i_ch%s.dat'%(shot,shot,m.group(1)),x[:nsamples,4*10000:4*10250])
-                    DC = fft.dct(X,axis=0)
-                    HP = fft.idct(DC*(1-dct_finefilt),axis=0)
-                    #LP = fft.idct(DC*dct_finefilt,axis=0)
-                    #LADC = np.log2(1+np.abs(DC))
-                    #LADC[0,:] *= np.sign(DC[0,:])
-                    np.savetxt('./figs/gray/bes/shot%i/dct_fine_bes_HP_shot%i_ch%s.dat'%(shot,shot,m.group(1)),HP[:nsamples,4*10000:4*10250])
-                    #np.savetxt('./figs/gray/bes/shot%i/dct_fine_bes_LP_shot%i_ch%s.dat'%(shot,shot,m.group(1)),LP[:nsamples,4*10000:4*10250])
-                    RC = DC[0,:]
-                    ELM = np.max(HP,axis=0) # lim is likely 10V so presumably
-                    ELM *= 255/10
-                    ARG = np.argmax(HP,axis=0).astype(np.uint16) * (ELM>thresh)
-                    #hpdset = grp_bes.create_dataset('%s_dct_fine'%(m.group(1)),data=(DC[nsamples,:]).astype(np.uint16))
-                    elmdset = grp_bes.create_dataset('%s_elm'%(m.group(1)),data=(ELM).astype(np.uint16))
-                    argdset = grp_bes.create_dataset('%s_arg'%(m.group(1)),data=(ARG).astype(np.uint16))
-                    recdset = grp_bes.create_dataset('%s_rec'%(m.group(1)),data=(RC).astype(np.uint16))
-                    elmdset.attrs['cutoff+'] = cutoff
-                    elmdset.attrs['thresh'] = thresh
-                    argdset.attrs['cutoff+'] = cutoff
-                    recdset.attrs['cutoff-'] = cutoff
-
-                    '''
-                    Try using just a long 1ms dct and then pick out the low frequency AE modes and the high frequency ELMs.
-                    The recovery after the ELM maybe treated in the horizontal dimension matched filter in the 'fine' dct, but probably better to use only one dct
-                    Use the dct of the dct, the harmonics in the modes would show up as a frequency comb
-                    '''
-
-
-                    np.savetxt('./figs/gray/bes/shot%i/dct_fine_bes_RC_shot%i_ch%s.dat'%(shot,shot,m.group(1)),RC[4*10000:4*10250])
-                    np.savetxt('./figs/gray/bes/shot%i/dct_fine_bes_ELM_shot%i_ch%s.dat'%(shot,shot,m.group(1)),np.column_stack((ELM,ARG))[4*10000:4*10250,:])
-                    '''
-                    X = np.fft.fft(x,axis=0)
-                    AX = np.abs(X)
-                    if np.max(AX)==0:
-                        continue
-                    OUT = np.log2(AX+1)
-                    OUT[:2,:] = 0
-                    OUT[-2:,:] = 0
-                    OUT *= (2**16-1)/np.max(OUT)
-                    grp_bes.create_dataset('%s_logabs_fine'%m.group(1),data=OUT[:nsamples,:].astype(np.uint16))
-                    cv2.imwrite('./figs/gray/bes/shot%i/logabs_fine_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),(255-OUT[:,:2*(OUT.shape[1]//2)]//2**7).astype(np.uint8))
-                    '''
 
         #closing with h5py.File() as f
     
