@@ -226,7 +226,7 @@ def main():
                         cv2.imwrite('./figs/color/ece_shot%i_ch%s_color2.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,3:])
 
         nsamples *= 2
-        print('BES nfolds*nsamples = ',nfolds*nsamples)
+        print('BES nfolds*nsamples = ',nfolds*nsamples) ## time steps in 'folds' are (1 musec * nsamples = e.g. 2048*1mu = 2.048ms)
         t = t_bes[inds_bes_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
         f.create_dataset('times_bes',data=t)
 
@@ -253,13 +253,15 @@ def main():
                     elmpop -= np.mean(elmpop)
                     elmpop *= (2**15-1)/np.max(np.abs(elmpop))
 
-                    AX = np.abs(X)[::2,:]
+                    AX = np.abs(X)[::2,:] ## AX is symmetric along axis=0 since it is the abs of dct coefficients i.e. root(power spectrum).
                     #PX = np.angle(X)
                     if np.max(AX)==0:
                         continue
-                    OUT = np.log2(AX+1)
+                    OUT = np.log2(AX+1) ## again, this is symmetric along axis=0 since it is the log(root power spectrum + 1)
 
-                    DOUT = fft.idct(fft.dct(OUT,axis=0)*dct_filt_besderiv,axis=0)
+                    qout = fft.dct(OUT,axis=0)  ## OUT is still symmetric about axis=0, BUT dct_filt_besderiv probably should be not... explore here, there maybe a bug
+                                                ## qout (q for q-frency of the cepstrum)
+                    DOUT = fft.idct(qout*dct_filt_besderiv,axis=0)
                     DOUT -= np.mean(DOUT)
                     DOUT *= (2**16-1)/np.max(DOUT)*(DOUT>0)
                     '''DOUTp = np.log2(1 + DOUT*(DOUT>1))
@@ -273,9 +275,10 @@ def main():
                     #BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt_bes ,axis=0)
                     #OUT -= BG
                     OUT *= (2**16-1)/np.max(OUT[3:-2,:])
-                    grp_bes.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:].astype(np.uint16))
-                    grp_bes.create_dataset('%s_logabsfilt'%m.group(1),data=DOUT[:nsamples,:].astype(np.uint16))
-                    grp_bes.create_dataset('%s_elmpop'%m.group(1),data=elmpop[:nsamples,:].astype(np.uint16))
+                    grp_bes.create_dataset('%s_la'%m.group(1),data=OUT[:nsamples,:].astype(np.uint16))
+                    grp_bes.create_dataset('%s_laf'%m.group(1),data=DOUT[:nsamples,:].astype(np.uint16)) # laf == logabsfilt
+                    grp_bes.create_dataset('%s_dct_laf'%m.group(1),data=qout[:nsamples:2,:].astype(np.uint16))
+                    grp_bes.create_dataset('%s_elmpop'%m.group(0),data=elmpop[:nsamples,:].astype(np.uint16))
                     grp_bes.create_dataset('%s_elmrec'%m.group(1),data=elmrec[:nsamples,:].astype(np.uint16))
                     imout = np.full((nsamples,nfolds,3),128,dtype=np.uint8)
                     imout[:,:,2] = np.flip(elmpop[:nsamples,:]//2**8+128,axis=0).astype(np.uint8)
