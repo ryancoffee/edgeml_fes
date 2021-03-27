@@ -174,7 +174,7 @@ def main():
                         OUTFILT = OUT * 1./(1+np.exp(fx) / np.exp(p))
                         grp_ece.create_dataset('%s_filt'%(m.group(1)),data=OUTFILT[:nsamples//2,:].astype(np.uint8))
 
-                    if True:
+                    if False:
                         #enabling 3x3 conv kernel
                         # use a 3x3 kernel in pi radian rotation, max val, no pool.
                         QOUT = np.fft.fft2(OUT)
@@ -199,7 +199,7 @@ def main():
                         for i in range(NEWOUT.shape[2]):
                             NEWOUT[:,:,i] = 0.333*np.fft.ifft2(QOUT*MASK[i]).real
                         grp_ece.create_dataset('%s_filtlog'%(m.group(1)),data=(NEWOUT[:nsamples//2,:,:]).astype(np.int16))
-                        cv2.imwrite('dft_shot%i_ch%s_color.png'%(shot,m.group(1)),NEWOUT.astype(np.uint8)[:nsamples//2,:,:3])
+                        #cv2.imwrite('dft_shot%i_ch%s_color.png'%(shot,m.group(1)),NEWOUT.astype(np.uint8)[:nsamples//2,:,:3])
 
                     print(ch,x.shape)
         '''
