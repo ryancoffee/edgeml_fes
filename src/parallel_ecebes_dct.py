@@ -234,7 +234,7 @@ def run_shot(shot,params):
         dct_filt_ecederiv = dct_deriv_buildfilt((nsamples,nfolds),cut=(8,3*nsamples//4)) 
         dct_filt_ece = dct_buildfilt((nsamples,nfolds),cut=(0,4*nsamples//4)) 
 
-        for ch in chans_ece[19:21]:
+        for ch in chans_ece:
             m = re.search('^ece.{2}(\d+)$',ch)
             if m:
                 print('%s\t%s\t%ix%i'%(m.group(0),m.group(1),nsamples,nfolds))
@@ -304,7 +304,7 @@ def run_shot(shot,params):
         dct_filt_besdderiv = dct_deriv_buildfilt((nsamples,nfolds),cut=(0,nsamples)) 
 
         grp_bes = f.create_group('bes')
-        for ch in chans_bes[40:42]:
+        for ch in chans_bes:
             m = re.search('^bes.{2}(\d+)',ch)
             if m:
                 print('%s\t%s\t%ix%i'%(m.group(0),m.group(1),nsamples,nfolds))
