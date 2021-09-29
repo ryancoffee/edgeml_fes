@@ -12,6 +12,8 @@ import time
 from joblib import Parallel, delayed
 from scipy import fft, stats
 
+from utils import dctLogic, scanedges
+
 
 def tanh(x,w):
     return 0.5*(1.+np.tanh(x/w))
