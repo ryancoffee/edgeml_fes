@@ -130,22 +130,18 @@ def findroot(th,g):
 
 
 
-def main():
-    #path = '/projects/EKOLEMEN/ecebes'
-    path = '/projects/EKOLEMEN/ecebes'
-    shot = 122117
-    if len(sys.argv)>1:
-        m = re.search('^(.+)(\d{6})$',sys.argv[1])
-        if m:
-            path = m.group(1)
-            shot = int(m.group(2))
-    else:
-        print('syntax: %s <path/filehead'%sys.argv[0])
+
+def process(path,shot):
+
     ecefile = '%s/%i%s'%(path,shot,'ECE')
     besfile = '%s/%i%s'%(path,shot,'BES')
-    outfile = './data/%s_dct.h5'%(shot)
+    if not os.path.isdir('%s/h5files'%path):
+        mode = 0o774
+        os.mkdir('%s/h5files'%path,mode)
+    outfile = '%s/h5files/%s_dct.h5'%(path,shot)
 
-    with h5py.File(outfile,'w') as f:
+    with h5py.File(outfile,'a') as f:
+        grp_shot = f.create_group('shot%i'%shot)
         data_ece = np.load(ecefile,allow_pickle=True)
         data_bes = np.load(besfile,allow_pickle=True)
         chans_ece = list(data_ece.keys())
@@ -160,12 +156,18 @@ def main():
         sz_bes = t_bes[inds_bes_coince].shape[0]
         print('sz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i'%(sz_ece,sz_bes,(sz_bes-2*sz_ece)))
 
+
+        ######################################
+        ####### ECE section ##################
+        ######################################
+
+
         nsamples = 1024
         nfolds = int(sz_ece//nsamples)
         print('ECE nfolds*nsamples = ',nfolds*nsamples)
         t = t_ece[inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
-        f.create_dataset('times ece',data=t)
-        grp_ece = f.create_group('ece')
+        grp_ece = grp_shot.create_group('ece')
+        grp_ece.create_dataset('times',data=t,dtype=np.int64)
 
 
         mask,MASK = getmask((nsamples,nfolds))
@@ -201,35 +203,23 @@ def main():
                     OUT *= (2**16-1)/np.max(OUT)
                     grp_ece.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:nfolds].astype(np.uint16))
                     grp_ece.create_dataset('%s_logabsfilt'%m.group(1),data=DOUT[:nsamples,:nfolds].astype(np.uint16))
-                    cv2.imwrite('./figs/gray/ece/shot%i/logabs_ece_shot%i_ch%s.png'%(shot,shot,m.group(1)),(255-OUT[:,:2*(OUT.shape[1]//2)]//2**8).astype(np.uint8))
-                    cv2.imwrite('./figs/gray/ece/shot%i/logabsfilt_ece_shot%i_ch%s.png'%(shot,shot,m.group(1)),(255-DOUT//2**8).astype(np.uint8))
 
-                    '''
-                    OK, the powerspectrum here is necessarily symmetric in axis0, and the phase is neccesarily anti-symmetric.
-                    We should be able to use the discrete cosine and sine transforms.
-                    '''
 
-                    if False:
-                        DFTOUT = np.fft.fft2(OUT)
-                        NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=float)
-                        for i in range(len(MASK)):
-                            NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*MASK[i]).real
-                        NEWOUT *= (NEWOUT>0)
-                        grp_ece.create_dataset('%s_directional'%(m.group(1)),data=(NEWOUT[:nsamples//2,:,:]).astype(np.int16))
-                        cv2.imwrite('./figs/color/ece_shot%i_ch%s_color1.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,:3])
-                        cv2.imwrite('./figs/color/ece_shot%i_ch%s_color2.png'%(shot,m.group(1)),(NEWOUT//2**8).astype(np.uint8)[:,:,3:])
+        ######################################
+        ####### BES section ##################
+        ######################################
 
         nsamples *= 2
         print('BES nfolds*nsamples = ',nfolds*nsamples) ## time steps in 'folds' are (1 musec * nsamples = e.g. 2048*1mu = 2.048ms)
         t = t_bes[inds_bes_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
-        f.create_dataset('times_bes',data=t)
 
         dct_filt_ELMrecover = dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples//4)) 
         dct_filt_ELMpop = dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples)) 
         dct_filt_besderiv = dct_deriv_buildfilt((nsamples,nfolds),cut=(0,3*nsamples//4)) 
         dct_filt_besdderiv = dct_deriv_buildfilt((nsamples,nfolds),cut=(1,3*nsamples//4)) 
 
-        grp_bes = f.create_group('bes')
+        grp_bes = grp_shot.create_group('bes')
+        grp_bes.create_dataset('times',data=t,dtype=int)
         for ch in chans_bes:
             m = re.search('^bes.{2}(\d+)',ch)
             if m:
@@ -258,12 +248,6 @@ def main():
                     DOUT = fft.idct(qout*dct_filt_besderiv,axis=0)
                     DOUT -= np.mean(DOUT)
                     DOUT *= (2**16-1)/np.max(DOUT)*(DOUT>0)
-                    '''DOUTp = np.log2(1 + DOUT*(DOUT>1))
-                    DOUTp *= (2**16-1)/np.max(DOUTp)
-                    DOUTm = np.log2(1 - DOUT*(DOUT<-1))
-                    DOUTm *= (2**16-1)/np.max(DOUTm)
-                    DOUT = DOUTp - DOUTm + 2**15
-                    '''
 
                     ### BG subtraction doesn't work for BES since ELM pops would then be excluded
                     #BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt_bes ,axis=0)
@@ -274,32 +258,27 @@ def main():
                     grp_bes.create_dataset('%s_dct_laf'%m.group(1),data=qout[:nsamples:2,:].astype(np.uint16))
                     grp_bes.create_dataset('%s_elmpop'%m.group(0),data=elmpop[:nsamples,:].astype(np.uint16))
                     grp_bes.create_dataset('%s_elmrec'%m.group(1),data=elmrec[:nsamples,:].astype(np.uint16))
-                    imout = np.full((nsamples,nfolds,3),128,dtype=np.uint8)
-                    imout[:,:,2] = np.flip(elmpop[:nsamples,:]//2**8+128,axis=0).astype(np.uint8)
-                    imout[:,:,1] = np.flip(elmpop[:nsamples,:]//2**8+128,axis=0).astype(np.uint8)
-                    imout[:,:,0] = np.flip(elmrec[:nsamples,:]//2**8+128,axis=0).astype(np.uint8)
-
-                    #cv2.imwrite('./figs/gray/bes/shot%i/logabs_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),(255-OUT[:,:2*(OUT.shape[1]//2)]//2**7).astype(np.uint8))
-                    cv2.imwrite('./figs/gray/bes/shot%i/logabs_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(255-OUT[::2,:]//2**8,axis=0).astype(np.uint8))
-                    cv2.imwrite('./figs/gray/bes/shot%i/logabsfilt_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(255-DOUT[::2,:]//2**8,axis=0).astype(np.uint8))
-                    cv2.imwrite('./figs/color/bes/shot%i/elm_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),imout)
-                    x -= np.min(x)
-                    x *= 255/np.max(x)
-                    cv2.imwrite('./figs/gray/bes/shot%i/straight_bes_shot%i_ch%s.png'%(shot,shot,m.group(1)),np.flip(x[:nsamples,:],axis=0).astype(np.uint8))
-
-                    if False:
-                        DFTOUT = np.fft.fft2(OUT)
-                        NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=float)
-                        for i in range(len(MASK)):
-                            NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*MASK[i]).real
-                        NEWOUT *= (NEWOUT>0)
-                        grp_bes.create_dataset('%s_directional'%(m.group(1)),data=(NEWOUT[:nsamples//2,:,:]).astype(np.uint16))
-                        cv2.imwrite('./figs/color/bes_shot%i_ch%s_color1.png'%(shot,m.group(1)),(255-NEWOUT//2**9).astype(np.uint8)[:,:,[0,1,2]])
-                        cv2.imwrite('./figs/color/bes_shot%i_ch%s_color2.png'%(shot,m.group(1)),(255-NEWOUT//2**9).astype(np.uint8)[:,:,[2,3,3]])
-
 
         #closing with h5py.File() as f
     
+    return
+
+def main():
+    #path = '/projects/EKOLEMEN/ecebes'
+    path = '~/coffee_group/EKOLEMEN/ecebes'
+    shot = 122117
+    if len(sys.argv)>1:
+        shotstrings = sys.argv[2:]
+        for shotstring in shotstrings:
+            m = re.search('^(.+)(\d{6})\w*$',sys.argv[1])
+            if m:
+                path = m.group(1)
+                shot = int(m.group(2))
+                process(path,shot)
+    else:
+        print('syntax: %s <path/filehead'%sys.argv[0])
+        return
+
     return
 
 if __name__ == '__main__':
