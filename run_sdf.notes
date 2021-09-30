@@ -1,0 +1,5 @@
+module load slac-ml
+
+./explore_ecebes_dct.py /gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/ecebes 145387 122117
+
+check that the python is being pointed to correctly.

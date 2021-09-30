@@ -1,12 +1,15 @@
+#!/sdf/sw/images/slac-ml/20200227.0/bin/python3
+
+#/usr/bin/python3
 #!/home/rc8936/.conda/envs/rnc_fes/bin/python
 
 import numpy as np
 import h5py
 import sys
 import re
-import cv2
-import os.path
-import multiprocessing
+#import cv2
+import os
+import multiprocessing as mp
 import time
 from joblib import Parallel, delayed
 from scipy import fft, stats
@@ -267,16 +270,17 @@ def main():
     #path = '/projects/EKOLEMEN/ecebes'
     path = '~/coffee_group/EKOLEMEN/ecebes'
     shot = 122117
-    if len(sys.argv)>1:
+
+    if len(sys.argv)>2:
+        path = sys.argv[1]
         shotstrings = sys.argv[2:]
         for shotstring in shotstrings:
-            m = re.search('^(.+)(\d{6})\w*$',sys.argv[1])
-            if m:
-                path = m.group(1)
-                shot = int(m.group(2))
+            shot = int(shotstring)
+            if os.path.exists('%s/%iBES'%(path,shot)) and os.path.exists('%s/%iECE'%(path,shot)):
+                print('processing shot %i'%shot)
                 process(path,shot)
     else:
-        print('syntax: %s <path/filehead'%sys.argv[0])
+        print('syntax: %s <path> <shotnumbers>'%sys.argv[0])
         return
 
     return
