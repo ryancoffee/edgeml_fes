@@ -141,16 +141,16 @@ def process(path,shot):
     if not os.path.isdir('%s/h5files'%path):
         mode = 0o774
         os.mkdir('%s/h5files'%path,mode)
-    outfile = '%s/h5files/%s_dct.h5'%(path,shot)
+    outfile = '%s/h5files/collection_dct.h5'%(path)
 
-    with h5py.File(outfile,'a') as f:
+    with h5py.File(outfile,'w') as f:
         grp_shot = f.create_group('shot%i'%shot)
         data_ece = np.load(ecefile,allow_pickle=True)
         data_bes = np.load(besfile,allow_pickle=True)
-        chans_ece = list(data_ece.keys())
-        chans_bes = list(data_bes.keys())
-        t_ece = ((data_ece[chans_ece[0]]['data.time']+0.00025)*1e3).astype(int)
-        t_bes = ((data_bes[chans_bes[0]]['data.time']+0.00025)*1e3).astype(int)
+        keys_ece = list(data_ece.keys())
+        keys_bes = list(data_bes.keys())
+        t_ece = ((data_ece[keys_ece[0]]['data.time']+0.00025)*1e3).astype(int)
+        t_bes = ((data_bes[keys_bes[0]]['data.time']+0.00025)*1e3).astype(int)
         tmin,tmax = getextrema(t_bes,t_ece)
         print(tmin,tmax)
         inds_ece_coince = np.where((t_ece>tmin) * (t_ece<tmax))
@@ -171,6 +171,8 @@ def process(path,shot):
         t = t_ece[inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
         grp_ece = grp_shot.create_group('ece')
         grp_ece.create_dataset('times',data=t,dtype=np.int64)
+        ece_logabs = grp_ece.create_group('logabs')
+        ece_logabsfilt = grp_ece.create_group('logabsfilt')
 
 
         mask,MASK = getmask((nsamples,nfolds))
@@ -181,12 +183,13 @@ def process(path,shot):
         dct_filt_ecederiv = dct_deriv_buildfilt((nsamples,nfolds),cut=(8,3*nsamples//4)) 
         dct_filt_ece = dct_buildfilt((nsamples,nfolds),cut=(8,nsamples//4)) 
 
-        for ch in chans_ece[0]:
-            m = re.search('^ece.{2}(\d+)$',ch)
+        for k in keys_ece:
+            m = re.search('^ece.{2}(\d+)$',k)
             if m:
+                ch = m.group(1)
                 print('%s\t%s\t%ix%i'%(m.group(0),m.group(1),nsamples,nfolds))
-                if data_ece[ch]['data.ECE'].shape[0]>1:
-                    x = data_ece[ch]['data.ECE'][inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
+                if data_ece[k]['data.ECE'].shape[0]>1:
+                    x = data_ece[k]['data.ECE'][inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
                     #X = np.fft.fft(x,axis=0) #np.row_stack((x,np.flipud(x))),axis=0)
                     xx = np.row_stack((x,np.flip(x,axis=0)))
                     X = fft.dct(xx,axis=0)
@@ -201,11 +204,11 @@ def process(path,shot):
 
                     DOUT = fft.idct(fft.dct(OUT,axis=0)*dct_filt_ecederiv,axis=0)
                     DOUT -= np.min(DOUT)
-                    DOUT *= (2**16-1)/np.max(DOUT)
+                    #DOUT *= (2**16-1)/np.max(DOUT)
 
-                    OUT *= (2**16-1)/np.max(OUT)
-                    grp_ece.create_dataset('%s_logabs'%m.group(1),data=OUT[:nsamples,:nfolds].astype(np.uint16))
-                    grp_ece.create_dataset('%s_logabsfilt'%m.group(1),data=DOUT[:nsamples,:nfolds].astype(np.uint16))
+                    #OUT *= (2**16-1)/np.max(OUT)
+                    ece_logabs.create_dataset('%s'%ch,data=OUT[:nsamples,:nfolds], dtype=np.float32)
+                    ece_logabsfilt.create_dataset('%s'%ch,data=DOUT[:nsamples,:nfolds], dtype=np.float32)
 
 
         ######################################
@@ -223,22 +226,29 @@ def process(path,shot):
 
         grp_bes = grp_shot.create_group('bes')
         grp_bes.create_dataset('times',data=t,dtype=int)
-        for ch in chans_bes:
-            m = re.search('^bes.{2}(\d+)',ch)
+        bes_logabs = grp_bes.create_group('logabs')
+        bes_logabsfilt = grp_bes.create_group('logabsfilt')
+        bes_dctlaf = grp_bes.create_group('dct_laf')
+        bes_elmpop = grp_bes.create_group('elmpop')
+        bes_elmrec = grp_bes.create_group('elmrec')
+
+        for k in keys_bes:
+            m = re.search('^bes.{2}(\d+)',k)
             if m:
+                ch = m.group(1)
                 print('%s\t%s\t%ix%i'%(m.group(0),m.group(1),nsamples,nfolds))
-                if (data_bes[ch]['data.BES'].shape[0]>1):
-                    x = data_bes[ch]['data.BES'][inds_bes_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
+                if (data_bes[k]['data.BES'].shape[0]>1):
+                    x = data_bes[k]['data.BES'][inds_bes_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
                     xx = np.row_stack((x,np.flip(x,axis=0)))
                     #X = np.fft.fft(x,axis=0)
                     X = fft.dct(xx,axis=0)
                     elmrec = -fft.idst(X*dct_filt_ELMrecover,axis=0)
                     elmpop = -fft.idst(X*dct_filt_ELMpop,axis=0) 
                     elmrec -= np.mean(elmrec)
-                    elmrec *= (2**15-1)/np.max(np.abs(elmrec))
+                    #elmrec *= (2**15-1)/np.max(np.abs(elmrec))
 
                     elmpop -= np.mean(elmpop)
-                    elmpop *= (2**15-1)/np.max(np.abs(elmpop))
+                    #elmpop *= (2**15-1)/np.max(np.abs(elmpop))
 
                     AX = np.abs(X)[::2,:] ## AX is symmetric along axis=0 since it is the abs of dct coefficients i.e. root(power spectrum).
                     #PX = np.angle(X)
@@ -250,17 +260,17 @@ def process(path,shot):
                                                 ## qout (q for q-frency of the cepstrum)
                     DOUT = fft.idct(qout*dct_filt_besderiv,axis=0)
                     DOUT -= np.mean(DOUT)
-                    DOUT *= (2**16-1)/np.max(DOUT)*(DOUT>0)
+                    #DOUT *= (2**16-1)/np.max(DOUT)*(DOUT>0)
 
                     ### BG subtraction doesn't work for BES since ELM pops would then be excluded
                     #BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt_bes ,axis=0)
                     #OUT -= BG
-                    OUT *= (2**16-1)/np.max(OUT[3:-2,:])
-                    grp_bes.create_dataset('%s_la'%m.group(1),data=OUT[:nsamples,:].astype(np.uint16))
-                    grp_bes.create_dataset('%s_laf'%m.group(1),data=DOUT[:nsamples,:].astype(np.uint16)) # laf == logabsfilt
-                    grp_bes.create_dataset('%s_dct_laf'%m.group(1),data=qout[:nsamples:2,:].astype(np.uint16))
-                    grp_bes.create_dataset('%s_elmpop'%m.group(0),data=elmpop[:nsamples,:].astype(np.uint16))
-                    grp_bes.create_dataset('%s_elmrec'%m.group(1),data=elmrec[:nsamples,:].astype(np.uint16))
+                    #OUT *= (2**16-1)/np.max(OUT[3:-2,:])
+                    bes_logabs.create_dataset('%s'%ch,data=OUT[:nsamples,:],dtype=np.float32)
+                    bes_logabsfilt.create_dataset('%s'%ch,data=DOUT[:nsamples,:],dtype=np.float32) # laf == logabsfilt
+                    bes_dctlaf.create_dataset('%s'%ch,data=qout[:nsamples:2,:],dtype=np.float32)
+                    bes_elmpop.create_dataset('%s'%ch,data=elmpop[:nsamples,:],dtype=np.float32)
+                    bes_elmrec.create_dataset('%s'%ch,data=elmrec[:nsamples,:],dtype=np.float32)
 
         #closing with h5py.File() as f
     
