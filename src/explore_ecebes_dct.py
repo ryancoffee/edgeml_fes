@@ -268,9 +268,9 @@ def process(path,shot):
                     #OUT *= (2**16-1)/np.max(OUT[3:-2,:])
                     bes_logabs.create_dataset('%s'%ch,data=OUT[:nsamples,:],dtype=np.float32)
                     bes_logabsfilt.create_dataset('%s'%ch,data=DOUT[:nsamples,:],dtype=np.float32) # laf == logabsfilt
-                    bes_dctlaf.create_dataset('%s'%ch,data=qout[:nsamples:2,:],dtype=np.float32)
-                    bes_elmpop.create_dataset('%s'%ch,data=elmpop[:nsamples,:],dtype=np.float32)
-                    bes_elmrec.create_dataset('%s'%ch,data=elmrec[:nsamples,:],dtype=np.float32)
+                    bes_dctlaf.create_dataset('%s'%ch,data=qout[:nsamples:2,:],dtype=np.float32) ## this is the spectrogram of the log abs filtered... dct version...
+                    bes_elmpop.create_dataset('%s'%ch,data=elmpop[:nsamples,:],dtype=np.float32) ## This is where I save the ELM pop events
+                    bes_elmrec.create_dataset('%s'%ch,data=elmrec[:nsamples,:],dtype=np.float32) ## and the recovery from the pop
 
         #closing with h5py.File() as f
     
