@@ -174,11 +174,13 @@ def main():
     shots = [122117]
     if len(sys.argv)>1:
         path = sys.argv[1]
-        for s in sys.argv[2:]:
-            shots = [int(s) for s in sys.argv[2:]]
+        shots = [int(s) for s in sys.argv[2:]]
+        print('path = %s'%path)
     else:
         print('syntax: %s <path> <shotnums> '%sys.argv[0])
     _ = [print('%s\t%d'%(path,s)) for s in shots]
+    return
+
     params={}
     params['path'] = path
 

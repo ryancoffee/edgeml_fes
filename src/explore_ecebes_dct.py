@@ -143,7 +143,7 @@ def process(path,shot):
         os.mkdir('%s/h5files'%path,mode)
     outfile = '%s/h5files/collection_dct.h5'%(path)
 
-    with h5py.File(outfile,'w') as f:
+    with h5py.File(outfile,'a') as f:
         grp_shot = f.create_group('shot%i'%shot)
         data_ece = np.load(ecefile,allow_pickle=True)
         data_bes = np.load(besfile,allow_pickle=True)
