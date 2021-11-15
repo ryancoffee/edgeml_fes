@@ -1,8 +1,8 @@
 # edgeml_fes
-EdgeML for Fusion Energy Science project
+EdgeML for Fusion Energy
 
 ## DOE Program Support
-Thie project is funded by the US Department of Energy, Office of Science, Fusion Energy Science under Field Work Proposal Grant number ...
+This project is funded by the US Department of Energy, Office of Science, Fusion Energy Science under Field Work Proposal FWP-100636 *Machine Learning for Real-time Fusion Plasma Behavior Prediction and Manipulation*
 
 # Running on SLAC SDF  
 First obtain an account and log into the SLAC SDF cluster login node via ```ssh```.  
