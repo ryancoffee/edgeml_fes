@@ -41,6 +41,7 @@ srun --x11 --exclude tur015 --partition ml -n 1 --time 0-03:00:00 --pty /bin/bas
 ```
 
 # Notes to self  
+Moving to src/run_parallel_ecebes.py
 
 11/17/2021
 * group by detector, then by channel, then by 'method'
