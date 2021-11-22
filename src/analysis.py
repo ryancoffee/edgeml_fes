@@ -48,7 +48,6 @@ def run_shot(params):
 
 
         mask,MASK = utils.getmask3((nsamples,nfolds))
-        #mask,MASK = utils.getmask_deep((nsamples,nfolds))
         filt = utils.buildfilt(nsamples,nfolds,cutoff=.10)# by inspection this looks good for BG subtraction on ECE images
         dct_filt2d = utils.dct_buildfilt2d((nsamples,nfolds*2),cutoffs=(nsamples//16,nfolds//4)) # remember, we need to mirror the nfolds dimension, thus the *2
         dct_filt = utils.dct_buildfilt((nsamples,nfolds),cut=(0,64)) # remember, we need to mirror the nfolds dimension, thus the *2
@@ -65,7 +64,6 @@ def run_shot(params):
                     x = data_ece[chkey]['data.ECE'][inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
                     eceorig.create_dataset('%02i'%ch,data=x.astype(np.float16),dtype=np.float16)
 
-                    #X = np.fft.fft(x,axis=0) #np.row_stack((x,np.flipud(x))),axis=0)
                     xx = np.row_stack((x,np.flip(x,axis=0)))
                     X = fft.dct(xx,axis=0)
                     X[0,:] = 0
@@ -75,27 +73,8 @@ def run_shot(params):
                     OUT = np.log2(AX+1)
                     BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt,axis = 0)
                     OUT -= BG
-                    #OUT *= (OUT>0)
 
                     ecelogabs.create_dataset('%02i'%ch,data=OUT.astype(np.int16),dtype=np.int16)
-
-
-                    '''
-                    qout = fft.dct(OUT,axis=0)
-                    DOUT = fft.idct(qout*dct_filt_ece,axis=0)
-                    for w in range(DOUT.shape[1]):
-                        h,b = np.histogram(DOUT[:,w],bins=100)
-                        j = np.argmax(h)
-                        DOUT -= b[j]
-
-                    DOUT *= (2**15-1)/np.max(DOUT)
-
-                    OUT *= (2**15-1)/np.max(OUT)
-                    grp_ece.create_dataset('%s_la'%m.group(1),data=OUT[:nsamples,:nfolds].astype(np.uint16))
-                    grp_ece.create_dataset('%s_laf'%m.group(1),data=DOUT[:nsamples,:nfolds].astype(np.uint16))
-                    grp_ece.create_dataset('%s_dct_la'%m.group(1),data=qout[:nsamples:2,:].astype(np.int16))
-                    '''
-
 
                     DFTOUT = np.fft.fft2(OUT/(2**8))
                     NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=np.float16)
@@ -125,12 +104,8 @@ def run_shot(params):
 
         dct_filt_ELMrecover = utils.dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples//4)) 
         dct_filt_ELMpop = utils.dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples)) 
-        #dct_filt_bes = utils.dct_buildfilt((nsamples,nfolds),cut=(0,1*nsamples//8)) 
-        #dct_filt_besderiv = utils.dct_deriv_buildfilt((nsamples,nfolds),cut=(0,1*nsamples//4)) 
-        #dct_filt_besderiv_fat = utils.dct_deriv_buildfilt((nsamples,nfolds),cut=(0,1*nsamples//4)) 
-        #dct_filt_besdderiv_mask = utils.dct_deriv_buildfilt((nsamples,nfolds),cut=(0,1*nsamples//4)) 
 
-        dct_filt_besdderiv = utils.dct_dderiv_buildfilt((nsamples,nfolds),cut=(0,nsamples)) 
+        dct_filt_besdderiv = utils.dct_dderiv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples)) 
 
         for chkey in chans_bes:
             m = re.search('^bes.{2}(\d+)',chkey)
@@ -138,54 +113,30 @@ def run_shot(params):
                 ch = np.uint8(m.group(1))
                 print('pid%i\t%s\t%s\t%ix%i'%(os.getpid(),m.group(0),m.group(1),nsamples,nfolds))
                 if (data_bes[chkey]['data.BES'].shape[0]>1):
-                    x = data_bes[ch]['data.BES'][inds_bes_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
+                    x = data_bes[chkey]['data.BES'][inds_bes_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
                     besorig.create_dataset('%02i'%ch,data=x.astype(np.float16),dtype=np.float16)
 
                     xx = np.row_stack((x,np.flip(x,axis=0)))
-                    #X = np.fft.fft(x,axis=0)
                     X = fft.dct(xx,axis=0)
 
                     elmrec = -fft.idst(X*dct_filt_ELMrecover,axis=0)
                     elmpop = -fft.idst(X*dct_filt_ELMpop,axis=0) 
 
                     elmrec -= np.mean(elmrec)
-                    besrec.create_group('%02i'%ch,data=elmrec[:nsamples,:].astype(np.float16),dtype=np.float16)
+                    besrec.create_dataset('%02i'%ch,data=elmrec[:nsamples,:].astype(np.float16),dtype=np.float16)
                     elmpop -= np.mean(elmpop)
-                    bespop.create_group('%02i'%ch,data=elmpop[:nsamples,:].astype(np.float16),dtype=np.float16)
+                    bespop.create_dataset('%02i'%ch,data=elmpop[:nsamples,:].astype(np.float16),dtype=np.float16)
 
-                    #elmrec *= (2**14-1)/np.max(np.abs(elmrec))
-                    #elmpop *= (2**14-1)/np.max(np.abs(elmpop))
 
                     AX = np.abs(X)[::2,:] 
-                    #PX = np.angle(X)
                     if np.max(AX)==0:
                         continue
                     OUT = np.log2(AX+1) 
                     beslogabs.create_dataset('%02i'%ch,data=OUT.astype(np.float16),dtype=np.float16)
 
                     qout = fft.dct(np.row_stack((OUT,np.flip(OUT,axis=0))),axis=0)  
-                    DDOUT = fft.idct(qout*dct_filt_besdderiv,axis=0) # Whew... careful...this is the idct of somtething quadratic in FREQ
+                    DDOUT = fft.idct(qout*dct_filt_besdderiv,axis=0)[:nsamples,:] # Whew... careful...this is the idct of somtething quadratic in FREQ
                     besddla.create_dataset('%02i'%ch,data=DDOUT.astype(np.float16),dtype=np.float16)
-                    #DOUT -= np.mean(DOUT[nsamples//4:3*nsamples//4,:])
-                    #DOUT *= (2**14-1)/np.max(DOUT)
-                    #DOUT *= (DOUT>0)
-
-
-                    ### BG subtraction doesn't work for BES since ELM pops would then be excluded
-                    #BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt_bes ,axis=0)
-                    #OUT -= BG
-                    #OUT *= (2**14-1)/np.max(OUT[3:-2,:])
-                    #grp_bes.create_dataset('%s_la'%m.group(1),data=OUT[:nsamples,:].astype(np.int16))
-                    #grp_bes.create_dataset('%s_laf'%m.group(1),data=DOUT[:nsamples,:].astype(np.int16)) # laf == logabsfilt
-                    #grp_bes.create_dataset('%s_dct_la'%m.group(1),data=qout[:nsamples:2,:].astype(np.int16))
-                    #x -= np.mean(x)
-                    #x *= (2**15-1 )/np.max(x) 
-                    #grp_bes.create_dataset('%s_elm'%m.group(1),data=x.T.reshape(-1).astype(np.int16))
-                    #grp_bes.create_dataset('%s_elmpop'%m.group(1),data=elmpop[:nsamples,:].T.reshape(-1).astype(np.int16))
-                    #grp_bes.create_dataset('%s_elmrec'%m.group(1),data=elmrec[:nsamples,:].T.reshape(-1).astype(np.int16))
-
-                    ## In liew of BG subtraction, what if we instead use the heavy filter version of peak finding from the waveform analysis applied here to the spectrum axis=0
-                    # operate on DOUT
 
                     DFTOUT = np.fft.fft2(DDOUT)
                     NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=float)
