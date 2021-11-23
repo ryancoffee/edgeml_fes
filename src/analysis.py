@@ -47,12 +47,13 @@ def run_shot(params):
         ecedirectional = ecegrp.create_group('directional')
 
 
-        mask,MASK = utils.getmask3((nsamples,nfolds))
-        filt = utils.buildfilt(nsamples,nfolds,cutoff=.10)# by inspection this looks good for BG subtraction on ECE images
-        dct_filt2d = utils.dct_buildfilt2d((nsamples,nfolds*2),cutoffs=(nsamples//16,nfolds//4)) # remember, we need to mirror the nfolds dimension, thus the *2
-        dct_filt = utils.dct_buildfilt((nsamples,nfolds),cut=(0,64)) # remember, we need to mirror the nfolds dimension, thus the *2
-        dct_filt_ecederiv = utils.dct_deriv_buildfilt((nsamples,nfolds),cut=(8,3*nsamples//4)) 
-        dct_filt_ece = utils.dct_buildfilt((nsamples,nfolds),cut=(0,4*nsamples//4)) 
+        mask,MASK = utils.getderivmask3((nsamples,nfolds))
+
+        #filt = utils.buildfilt(nsamples,nfolds,cutoff=.10)# by inspection this looks good for BG subtraction on ECE images
+        #dct_filt2d = utils.dct_buildfilt2d((nsamples,nfolds*2),cutoffs=(nsamples//16,nfolds//4)) # remember, we need to mirror the nfolds dimension, thus the *2
+        #dct_filt = utils.dct_buildfilt((nsamples,nfolds),cut=(0,64)) # remember, we need to mirror the nfolds dimension, thus the *2
+        #dct_filt_ecederiv = utils.dct_deriv_buildfilt((nsamples,nfolds),cut=(8,3*nsamples//4)) 
+        #dct_filt_ece = utils.dct_buildfilt((nsamples,nfolds),cut=(0,4*nsamples//4)) 
 
         for chkey in chans_ece:
             m = re.search('^ece.{2}(\d+)$',chkey)
@@ -73,8 +74,6 @@ def run_shot(params):
                     OUT = np.log2(AX+1)
                     OUT -= np.mean(OUT[-nsamples//4:,:])
                     OUT *= 2**8
-                    #BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt,axis = 0)
-                    #OUT -= BG
 
                     ecelogabs.create_dataset('%02i'%ch,data=OUT.astype(np.float16),dtype=np.float16)
 
@@ -97,17 +96,18 @@ def run_shot(params):
         besgrp.create_dataset('times',data=t)
         besorig = besgrp.create_group('orig')
         beslogabs = besgrp.create_group('logabs')
-        besddla = besgrp.create_group('dderivlogabs')
+        #besdla = besgrp.create_group('derivlogabs')
         besdirectional = besgrp.create_group('directional')
         bespop = besgrp.create_group('pop')
-        besrec = besgrp.create_group('rec')
+        #besrec = besgrp.create_group('rec')
 
         mask,MASK = utils.getmask3((nsamples,nfolds))
 
-        dct_filt_ELMrecover = utils.dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples//4)) 
+        #dct_filt_ELMrecover = utils.dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples//4)) 
         dct_filt_ELMpop = utils.dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples)) 
 
-        dct_filt_besdderiv = utils.dct_dderiv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples)) 
+        dct_filt_besderiv = utils.dct_deriv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples)) 
+        #dct_filt_besdderiv = utils.dct_dderiv_buildfilt((nsamples*2,nfolds),cut=(0,nsamples)) 
 
         for chkey in chans_bes:
             m = re.search('^bes.{2}(\d+)',chkey)
@@ -121,11 +121,11 @@ def run_shot(params):
                     xx = np.row_stack((x,np.flip(x,axis=0)))
                     X = fft.dct(xx,axis=0)
 
-                    elmrec = -fft.idst(X*dct_filt_ELMrecover,axis=0)
+                    #elmrec = -fft.idst(X*dct_filt_ELMrecover,axis=0)
                     elmpop = -fft.idst(X*dct_filt_ELMpop,axis=0) 
 
-                    elmrec -= np.mean(elmrec)
-                    besrec.create_dataset('%02i'%ch,data=elmrec[:nsamples,:].astype(np.float16),dtype=np.float16)
+                    #elmrec -= np.mean(elmrec)
+                    #besrec.create_dataset('%02i'%ch,data=elmrec[:nsamples,:].astype(np.float16),dtype=np.float16)
                     elmpop -= np.mean(elmpop)
                     bespop.create_dataset('%02i'%ch,data=elmpop[:nsamples,:].astype(np.float16),dtype=np.float16)
 
@@ -138,15 +138,16 @@ def run_shot(params):
                     OUT *= 2**8
                     beslogabs.create_dataset('%02i'%ch,data=OUT.astype(np.float16),dtype=np.float16)
 
-                    qout = fft.dct(np.row_stack((OUT,np.flip(OUT,axis=0))),axis=0).astype(float)/(2**16)
-                    DDOUT = fft.idct(qout*dct_filt_besdderiv,axis=0)[:nsamples,:] # Whew... careful...this is the idct of somtething quadratic in FREQ
-                    besddla.create_dataset('%02i'%ch,data=DDOUT.astype(np.float16),dtype=np.float16)
+                    #qout = fft.dct(np.row_stack((OUT,np.flip(OUT,axis=0))),axis=0).astype(float)/(2**16)
+                    #DDOUT = fft.idct(qout*dct_filt_besdderiv,axis=0)[:nsamples,:] # Whew... careful...this is the idct of somtething quadratic in FREQ
+                    #DOUT = fft.idct(qout*dct_filt_besderiv,axis=0)[:nsamples,:] # Whew... careful...this is the idct of somtething quadratic in FREQ
+                    #besdla.create_dataset('%02i'%ch,data=DOUT.astype(np.float32),dtype=np.float32)
 
-                    DFTOUT = np.fft.fft2(DDOUT)
+                    DFTOUT = np.fft.fft2(OUT)
                     NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=float)
                     for i in range(len(MASK)):
                         NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*MASK[i]).real
-                        NEWOUT[:,:,i] -= np.mean(NEWOUT[:,:,i])
+                        #NEWOUT[:,:,i] -= np.mean(NEWOUT[:,:,i])
                     besdirectional.create_dataset('%02i'%ch,data=NEWOUT[:nsamples,:,:].astype(np.float16),dtype=np.float16)
 
 
