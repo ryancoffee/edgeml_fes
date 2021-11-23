@@ -71,16 +71,18 @@ def run_shot(params):
                     if np.max(AX)==0:
                         continue
                     OUT = np.log2(AX+1)
-                    BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt,axis = 0)
-                    OUT -= BG
+                    OUT -= np.mean(OUT[-nsamples//4:,:])
+                    OUT *= 2**8
+                    #BG = fft.idct(fft.dct(OUT,axis=0) * dct_filt,axis = 0)
+                    #OUT -= BG
 
-                    ecelogabs.create_dataset('%02i'%ch,data=OUT.astype(np.int16),dtype=np.int16)
+                    ecelogabs.create_dataset('%02i'%ch,data=OUT.astype(np.float16),dtype=np.float16)
 
                     DFTOUT = np.fft.fft2(OUT/(2**8))
-                    NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=np.float16)
+                    NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(MASK)),dtype=float)
                     for i in range(len(MASK)):
                         NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*MASK[i]).real
-                    ecedirectional.create_dataset('%02i'%ch,data=NEWOUT[:nsamples,:,:].astype(np.int16))
+                    ecedirectional.create_dataset('%02i'%ch,data=NEWOUT[:nsamples,:,:].astype(np.float16),dtype=np.float16)
 
 
 
@@ -131,10 +133,12 @@ def run_shot(params):
                     AX = np.abs(X)[::2,:] 
                     if np.max(AX)==0:
                         continue
-                    OUT = np.log2(AX+1) 
+                    OUT = np.log2(AX+1)
+                    OUT -= np.mean(OUT[-nsamples//4:,:])
+                    OUT *= 2**8
                     beslogabs.create_dataset('%02i'%ch,data=OUT.astype(np.float16),dtype=np.float16)
 
-                    qout = fft.dct(np.row_stack((OUT,np.flip(OUT,axis=0))),axis=0)  
+                    qout = fft.dct(np.row_stack((OUT,np.flip(OUT,axis=0))),axis=0).astype(float)/(2**16)
                     DDOUT = fft.idct(qout*dct_filt_besdderiv,axis=0)[:nsamples,:] # Whew... careful...this is the idct of somtething quadratic in FREQ
                     besddla.create_dataset('%02i'%ch,data=DDOUT.astype(np.float16),dtype=np.float16)
 
