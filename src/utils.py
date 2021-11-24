@@ -118,10 +118,12 @@ def getmask5(shape):
 def getmask3(shape):
     mask = [np.zeros(shape,dtype = float) for k in range(4)]
     MASK = [np.zeros(shape,dtype = complex) for k in range(4)]
-    mask[0][:3,1] = 1./3.
-    mask[1][:3,:3] = np.eye(3)/3.
-    mask[2][1,:3] = 1./3.
-    mask[3][:3,:3] = np.fliplr(np.eye(3))/3.
+    mask[0][:3,1] = 1.
+    mask[1][:3,:3] = np.eye(3)
+    mask[2][1,:3] = 1.
+    mask[3][:3,:3] = np.fliplr(np.eye(3))
+    for i in range(len(mask)):
+        mask[i] -= 1./3
     #mask[4][:3:2,0] = 1./3.
     #mask[4][1,1] = 1./3.
     #mask[5][:3,:3] = np.flip(mask[4][:3,:3],axis=1)
@@ -133,22 +135,21 @@ def getmask3(shape):
     return mask,MASK
 
 def getderivmask3(shape):
-    mask = [np.zeros(shape,dtype = float) for k in range(8)]
-    MASK = [np.zeros(shape,dtype = complex) for k in range(8)]
-    mask[0][:3,0] = 1./6.
-    mask[0][:3,2] = -1./6.
-    mask[1][:3,0] = -1./6.
-    mask[1][:3,2] = 1./6.
-    mask[2][0,:3] = 1./3.
-    mask[2][2,:3] = -1./3.
-    mask[3][0,:3] = -1./3.
-    mask[3][2,:3] = 1./3.
-
+    mask = [np.zeros(shape,dtype = float) for k in range(4)]
+    MASK = [np.zeros(shape,dtype = complex) for k in range(4)]
+    mask[0][0,:3] = 1./3.
+    mask[0][2,:3] = -1./3.
     a=np.triu(np.ones(3),k=0)-1
-    mask[4][:3,:3]=np.copy((a-np.flip(np.flip(a,axis=0),axis=1))/6.)
-    mask[5][:3,:3]=np.copy((np.flip(np.flip(a,axis=0),axis=1)-a)/6.)
-    mask[6][:3,:3]=np.copy((np.flip(a,axis=0)-np.flip(a,axis=1))/6.)
-    mask[7][:3,:3]=np.copy((np.flip(a,axis=1)-np.flip(a,axis=0))/6.)
+    mask[1][:3,:3]=np.copy((a-np.flip(np.flip(a,axis=0),axis=1))/6.)
+    mask[2][:3,:3]=np.copy((np.flip(a,axis=1)-np.flip(a,axis=0))/6.)
+    mask[3][:3,0] = 1./6.
+    mask[3][:3,2] = -1./6.
+    #mask[3][0,:3] = -1./3.
+    #mask[3][2,:3] = 1./3.
+    #mask[5][:3,:3]=np.copy((np.flip(np.flip(a,axis=0),axis=1)-a)/6.)
+    #mask[6][:3,:3]=np.copy((np.flip(a,axis=0)-np.flip(a,axis=1))/6.)
+    #mask[1][:3,0] = -1./6.
+    #mask[1][:3,2] = 1./6.
 
     for i in range(len(mask)):
         mask[i] = np.roll(np.roll(mask[i],-1,axis=0),-1,axis=1)
