@@ -16,8 +16,6 @@ parser.add_argument('-ipath', type=str,required=True, help='input path')
 parser.add_argument('-opath', type=str,required=True, help='ouput path')
 parser.add_argument('-nthreads',   type=int, default=4,required=True, help='Number of threads available to container')
 
-
-
 class Params:
     def __init__(self,inpath,outpath,shot):
         self.inpath = inpath
