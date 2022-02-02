@@ -1,6 +1,10 @@
 # edgeml\_fes
 EdgeML for Fusion Energy
 
+## Working notes
+Using sdf branch for updating `/src/run_parallel_ecebes.py`  
+Converting the scipy.fftpack.dct to the matrix version to check for performance improvement and also to use lower bit depth.
+
 ## DOE Program Support
 This project is funded by the US Department of Energy, Office of Science, Fusion Energy Science under Field Work Proposal FWP-100636 *Machine Learning for Real-time Fusion Plasma Behavior Prediction and Manipulation*
 
