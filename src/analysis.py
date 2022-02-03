@@ -9,6 +9,39 @@ from scipy import fft, stats
 import os
 import utils
 
+class Params:
+    def __init__(self,inpath,outpath,shot,nece=512,nbes=1024):
+        self.inpath = inpath
+        self.outpath = outpath
+        self.shot = shot
+        self.nsamples = {'ece':nece, 'bes':nbes}
+        self.t = {}
+        self.inds_coince = {}
+
+    def setnsamples(self,s,n):
+        self.nsamples[s]=n
+        return self
+    def getnsamples(self,s):
+        return self.nsamples[s]
+
+    def initTimes(self,data,dets=['ece','bes']):
+        for det in dets:
+            self.chans[det] = list(data[det].keys())
+            self.t[det] = ((data[det][chans[det][0]]['data.time'] + 0.00025)*1e3).astype(int)
+        return self
+
+    def setExtrema(self,dets):
+        self.t['min'] = np.max([np.min(self.t[d]) for d in dets]))
+        self.t['max'] = np.min([np.max(self.t[d]) for d in dets]))
+        return self
+
+    def initDet(self,f,detkey):
+        dgrp = f.create_group(detkey)
+        dgrp.attrs.create('sz',t[detkey][inds_coince[detkey]].shape[0])
+        dgrp.attrs.create('nsamples',params.nsamples[detkey])
+        dgrp.attrs.create('nfolds',nfolds[detkey])
+        return self
+
 
 def run_shot(params):
 
@@ -18,30 +51,41 @@ def run_shot(params):
     outpath = params.outpath
     outfile = '%s/%s_dct.h5'%(outpath,params.shot)
 
+    data = {}
+    t = {}
+    inds_coince = {}
+    sz = {}
+    nfolds = {}
+    data['ece'] = np.load(ecefile,allow_pickle=True)
+    data['bes'] = np.load(besfile,allow_pickle=True)
+    dets = ['ece','bes']
+    params.initTimes( data, dets )
+    params.setExtrema(dets)
+    params.t['bes'] = ((data['bes'][chans['bes'][0]]['data.time']+0.00025)*1e3).astype(int)
+    params.t['min'],params.t['max'] = utils.getextrema(params.t['bes'],params.t['ece'])
+    params.inds_coince['ece'] = np.where((params.t['ece']>params.t['min']) * (params.t['ece']<params.t['max']))
+    params.inds_coince['bes'] = np.where((params.t['bes']>params.t['min']) * (params.t['bes']<params.t['max']))
+    sz['ece'] = t['ece'][inds_coince['ece']].shape[0]
+    sz['bes'] = t['bes'][inds_coince['bes']].shape[0]
+    nfolds['ece'] = int(sz['ece']//params.nsamples['ece'])
+    nfolds['bes'] = int(sz['bes']//params.nsamples['bes'])
+    sz['ece'] = nfolds['ece']*params.nsamples['ece']
+    sz['bes'] = nfolds['bes']*params.nsamples['bes']
+
+    print('shot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.shot,sz['ece'],sz['bes'],(sz['bes']-2*sz['ece']),t['min'],t['max']))
+
+
     with h5py.File(outfile,'w') as f:
+        ## working ECE first ##
+        detkey = 'ece'
+        initDet(f,detkey,params)
         ecegrp = f.create_group('ece')
         besgrp = f.create_group('bes')
-        data_ece = np.load(ecefile,allow_pickle=True)
-        data_bes = np.load(besfile,allow_pickle=True)
-        chans_ece = list(data_ece.keys())
-        chans_bes = list(data_bes.keys())
-        t_ece = ((data_ece[chans_ece[0]]['data.time']+0.00025)*1e3).astype(int)
-        t_bes = ((data_bes[chans_bes[0]]['data.time']+0.00025)*1e3).astype(int)
-        tmin,tmax = utils.getextrema(t_bes,t_ece)
-        inds_ece_coince = np.where((t_ece>tmin) * (t_ece<tmax))
-        inds_bes_coince = np.where((t_bes>tmin) * (t_bes<tmax))
-        sz_ece = t_ece[inds_ece_coince].shape[0]
-        sz_bes = t_bes[inds_bes_coince].shape[0]
-        print('shot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.shot,sz_ece,sz_bes,(sz_bes-2*sz_ece),tmin,tmax))
-
-        ecegrp.attrs.create('sz',t_ece[inds_ece_coince].shape[0])
-        nsamples = params.nsamples_ece
-        nfolds = int(sz_ece/nsamples)
-        ecegrp.attrs.create('nsamples',nsamples)
-        ecegrp.attrs.create('nfolds',nfolds)
-        print('ECE nfolds*nsamples = %i * %i = %i'%(nfolds,nsamples,nfolds*nsamples))
-        t = t_ece[inds_ece_coince[0][:nsamples*nfolds]].reshape(nfolds,nsamples).T
-        ecegrp.create_dataset('times',data=t)
+        ecegrp.attrs.create('sz',t['ece'][inds_coince['ece']].shape[0])
+        ecegrp.attrs.create('nsamples',params.nsamples['ece'])
+        ecegrp.attrs.create('nfolds',nfolds['ece'])
+        print('ECE nfolds*nsamples = %i * %i = %i'%(nfolds['ece'],params.nsamples['ece'],nfolds['ece']*params.nsamples['ece']))
+        ecegrp.create_dataset('times',data=t['ece'][inds_coince['ece'][0][:params.nsamples['ece']*nfolds['ece']]].reshape(nfolds['ece'],nsamples['ece']).T)
         eceorig = ecegrp.create_group('orig')
         ecelogabs = ecegrp.create_group('logabs')
         ecedirectional = ecegrp.create_group('directional')
@@ -88,7 +132,6 @@ def run_shot(params):
         besgrp.attrs.create('sz',t_bes[inds_bes_coince].shape[0])
 
         nsamples = params.nsamples_bes 
-        nfolds = int(sz_bes/nsamples)
         besgrp.attrs.create('nsamples',nsamples)
         besgrp.attrs.create('nfolds',nfolds)
         print('BES nfolds*nsamples = %i * %i = %i'%(nfolds,nsamples,nfolds*nsamples))

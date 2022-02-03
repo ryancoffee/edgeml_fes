@@ -69,3 +69,61 @@ class BESmap():
         return None
 
 
+
+
+
+'''
+    Create a ECEmap object.  
+    Decide on a few configurations.
+    Create a dictionary the links shot number string e.g. 's145745' to the configuration
+    In the main code and store as meta maybe in h5 file or companion h5 the configuration mapping and the list of configurations 
+'''
+class ECEmap():
+    '''
+        Remember, the channels here need to by [1 ... 256) , and 
+        let's use 0s as no sensor so that we can easily incorporate sparse coo_matrix later
+        Plasma frequency flag is 1 'below', 2 'borderline', 3 'above'
+    '''
+    def __init__(self,shape=(64,)):
+        self.chanmap = np.full(shape,0,dtype=np.uint8)
+        self.pfflags = np.full(shape,0,dtype=np.uint8)
+        return None
+
+    def __call__(self):
+        newmap = BESmap(self.chanmap.shape)
+        newmap.chanmap = self.chanmap.copy()
+        newmap.pfflags = self.pfflags.copy()
+        return newmap
+
+    def getinds(self):
+        return np.where(self.chanmap)
+
+    def getmap(self):
+        return self.chanmap
+
+    def getspmap(self):
+        r,c = self.getinds()
+        return coo_matrix((self.chanmap[r,c],(r,c)),dtype=np.uint8)
+
+    def getpf(self):
+        return self.pfflags
+
+    def getsppf(self):
+        r,c = self.getinds()
+        return coo_matrix((self.pfflags[r,c],(r,c)),dtype=np.uint8)
+
+    def setinds(self,r,c,v):
+        self.chanmap[r,c] = v
+        return self
+
+    def setpfflag(self,r,c,v):
+        self.pfflags[r,c] = v
+        return self
+        
+    def print(self):
+        print('chanmap',self.chanmap)
+        print('PlasmaFrequencyFlag',self.pfflags)
+        return None
+
+
+
