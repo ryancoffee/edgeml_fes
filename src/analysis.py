@@ -17,11 +17,13 @@ class Params:
         self.nsamples = {'ece':nece, 'bes':nbes}
         self.t = {}
         self.inds_coince = {}
+        self.sz = {}
+        self.nfolds = {}
 
-    def setnsamples(self,s,n):
+    def setNsamples(self,s,n):
         self.nsamples[s]=n
         return self
-    def getnsamples(self,s):
+    def getNsamples(self,s):
         return self.nsamples[s]
 
     def initTimes(self,data,dets=['ece','bes']):
@@ -35,13 +37,49 @@ class Params:
         self.t['max'] = np.min([np.max(self.t[d]) for d in dets]))
         return self
 
-    def initDet(self,f,detkey):
+    def initH5det(self,f,detkey):
         dgrp = f.create_group(detkey)
-        dgrp.attrs.create('sz',t[detkey][inds_coince[detkey]].shape[0])
-        dgrp.attrs.create('nsamples',params.nsamples[detkey])
         dgrp.attrs.create('nfolds',nfolds[detkey])
+        dgrp.attrs.create('sz',self.sz[detkey])
+        dgrp.attrs.create('nsamples',self.nsamples[detkey])
         return self
 
+    def fillH5times(self,f,detkey):
+        dgrp = f[detkey]
+        dgrp.create_dataset('times',data=self.t[detkey][self.inds_coince[detkey][0][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T)
+        return self
+
+    def fillIndsCoince(self,dets = ['ece','bes']):
+        for det in dets:
+            self.inds_coince[det] = np.where((self.t[det]>self.t['min']) * (self.t[det]<self.t['max']))
+            self.sz[det] = self.t[det][self.inds_coince[det]].shape[0]
+        return self
+
+    def setFolds(self,dets = ['ece','bes']):
+        for det in dets:
+            self.nfolds[det] = int(self.sz[det]//self.nsamples[det])
+            self.sz[det] = self.nfolds[det]*self.nsamples[det]
+        return self
+
+    def getSize(self,det = 'ece'):
+        return self.sz[det]
+
+    def setthresh(self,det = 'ece'):
+        if det == 'ece':
+            self.dirthresh[det] = 1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[detkey))/500.,int(2))) + 100. )
+        if det == 'bes':
+            self.dirthresh[det] = 
+        return self
+
+    def initH5datasets(self,f,detkey):
+        if detkey == 'ece':
+            ecegrp = f[detkey]
+            eceorig = ecegrp.create_group('orig')
+            ecelogabs = ecegrp.create_group('logabs')
+            ecedirectional = ecegrp.create_group('directional').attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(nsamples)/500.,int(2))) + 100.)
+        if defkey == 'bes':
+            besgrp = f[detkey]
+        return self
 
 def run_shot(params):
 
@@ -59,37 +97,26 @@ def run_shot(params):
     data['ece'] = np.load(ecefile,allow_pickle=True)
     data['bes'] = np.load(besfile,allow_pickle=True)
     dets = ['ece','bes']
-    params.initTimes( data, dets )
-    params.setExtrema(dets)
-    params.t['bes'] = ((data['bes'][chans['bes'][0]]['data.time']+0.00025)*1e3).astype(int)
-    params.t['min'],params.t['max'] = utils.getextrema(params.t['bes'],params.t['ece'])
-    params.inds_coince['ece'] = np.where((params.t['ece']>params.t['min']) * (params.t['ece']<params.t['max']))
-    params.inds_coince['bes'] = np.where((params.t['bes']>params.t['min']) * (params.t['bes']<params.t['max']))
-    sz['ece'] = t['ece'][inds_coince['ece']].shape[0]
-    sz['bes'] = t['bes'][inds_coince['bes']].shape[0]
-    nfolds['ece'] = int(sz['ece']//params.nsamples['ece'])
-    nfolds['bes'] = int(sz['bes']//params.nsamples['bes'])
-    sz['ece'] = nfolds['ece']*params.nsamples['ece']
-    sz['bes'] = nfolds['bes']*params.nsamples['bes']
+    params.initTimes( data, dets ).setExtrema(dets)
+    params.fillIndsCoince(dets).setFolds(dets)
 
-    print('shot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.shot,sz['ece'],sz['bes'],(sz['bes']-2*sz['ece']),t['min'],t['max']))
+    print('shot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.shot,params.sz['ece'],params.sz['bes'],(params.sz['bes']-2*params.sz['ece']),params.t['min'],params.t['max']))
 
 
     with h5py.File(outfile,'w') as f:
         ## working ECE first ##
         detkey = 'ece'
-        initDet(f,detkey,params)
-        ecegrp = f.create_group('ece')
-        besgrp = f.create_group('bes')
-        ecegrp.attrs.create('sz',t['ece'][inds_coince['ece']].shape[0])
-        ecegrp.attrs.create('nsamples',params.nsamples['ece'])
-        ecegrp.attrs.create('nfolds',nfolds['ece'])
-        print('ECE nfolds*nsamples = %i * %i = %i'%(nfolds['ece'],params.nsamples['ece'],nfolds['ece']*params.nsamples['ece']))
-        ecegrp.create_dataset('times',data=t['ece'][inds_coince['ece'][0][:params.nsamples['ece']*nfolds['ece']]].reshape(nfolds['ece'],nsamples['ece']).T)
+        params.initH5det(f,detkey).fillH5times(f,detkey)
+        print('ECE nfolds*nsamples = %i * %i = %i'%(params.nfolds['ece'],params.nsamples['ece'],params.nfolds['ece']*params.nsamples['ece']))
+
+        params.initH5datasets(detkey)
+
+        ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
+        params.setthresh( 1.e3*np.exp(-1.*np.power(np.arange(params.getNsamples(detkey))/500.,int(2))) + 100. )
+
         eceorig = ecegrp.create_group('orig')
         ecelogabs = ecegrp.create_group('logabs')
         ecedirectional = ecegrp.create_group('directional')
-        ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
         ecedirectional.attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(nsamples)/500.,int(2))) + 100.)
 
 
@@ -129,6 +156,7 @@ def run_shot(params):
 
 
 
+        besgrp = f.create_group('bes')
         besgrp.attrs.create('sz',t_bes[inds_bes_coince].shape[0])
 
         nsamples = params.nsamples_bes 
