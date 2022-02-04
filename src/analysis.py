@@ -19,6 +19,7 @@ class Params:
         self.inds_coince = {}
         self.sz = {}
         self.nfolds = {}
+        self.dirthresh = {}
 
     def setNsamples(self,s,n):
         self.nsamples[s]=n
@@ -64,11 +65,11 @@ class Params:
     def getSize(self,det = 'ece'):
         return self.sz[det]
 
-    def setthresh(self,det = 'ece'):
+    def setThresh(self,det = 'ece'):
         if det == 'ece':
-            self.dirthresh[det] = 1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[detkey))/500.,int(2))) + 100. )
+            self.dirthresh[det] = 1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[detkey])/500.,int(2))) + 100. )
         if det == 'bes':
-            self.dirthresh[det] = 
+            self.dirthresh[det] = np.ones((self.nsamples[detkey],),dtype=np.float32)
         return self
 
     def initH5datasets(self,f,detkey):
@@ -76,6 +77,7 @@ class Params:
             ecegrp = f[detkey]
             eceorig = ecegrp.create_group('orig')
             ecelogabs = ecegrp.create_group('logabs')
+            self.setThresh
             ecedirectional = ecegrp.create_group('directional').attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(nsamples)/500.,int(2))) + 100.)
         if defkey == 'bes':
             besgrp = f[detkey]
@@ -106,25 +108,24 @@ def run_shot(params):
     with h5py.File(outfile,'w') as f:
         ## working ECE first ##
         detkey = 'ece'
-        params.initH5det(f,detkey).fillH5times(f,detkey)
+        params.initH5det(f,detkey).fillH5times(f,detkey).setThresh(detkey)
         print('ECE nfolds*nsamples = %i * %i = %i'%(params.nfolds['ece'],params.nsamples['ece'],params.nfolds['ece']*params.nsamples['ece']))
-
         params.initH5datasets(detkey)
-
         ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
-        params.setthresh( 1.e3*np.exp(-1.*np.power(np.arange(params.getNsamples(detkey))/500.,int(2))) + 100. )
-
+        '''
         eceorig = ecegrp.create_group('orig')
         ecelogabs = ecegrp.create_group('logabs')
         ecedirectional = ecegrp.create_group('directional')
         ecedirectional.attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(nsamples)/500.,int(2))) + 100.)
+        params.setthresh( 1.e3*np.exp(-1.*np.power(np.arange(params.getNsamples(detkey))/500.,int(2))) + 100. )
+        '''
 
 
         mask,MASK = utils.getderivmask3((nsamples,nfolds))
 
         dct_filt = utils.dct_buildfilt((2*nsamples,nfolds),cut=(0,nsamples)) # remember, we need to mirror the nfolds dimension, thus the *2
 
-        for chkey in chans_ece:
+        for chkey in params.chans_ece:
             m = re.search('^ece.{2}(\d+)$',chkey)
             if m:
                 ch = np.uint8(m.group(1))
