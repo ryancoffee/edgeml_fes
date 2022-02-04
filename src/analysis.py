@@ -20,6 +20,7 @@ class Params:
         self.sz = {}
         self.nfolds = {}
         self.dirthresh = {}
+        self.chans = {}
 
     def setNsamples(self,s,n):
         self.nsamples[s]=n
@@ -83,6 +84,16 @@ class Params:
             besgrp = f[detkey]
         return self
 
+    def initChans(self,det,data)
+        self.chans[det] = list(data[det].keys())
+        return self
+
+
+
+
+
+
+
 def run_shot(params):
 
     inpath = params.inpath
@@ -101,6 +112,8 @@ def run_shot(params):
     dets = ['ece','bes']
     params.initTimes( data, dets ).setExtrema(dets)
     params.fillIndsCoince(dets).setFolds(dets)
+    for det in dets:
+        params.initChans(det,data[det])
 
     print('shot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.shot,params.sz['ece'],params.sz['bes'],(params.sz['bes']-2*params.sz['ece']),params.t['min'],params.t['max']))
 
@@ -120,6 +133,8 @@ def run_shot(params):
         params.setthresh( 1.e3*np.exp(-1.*np.power(np.arange(params.getNsamples(detkey))/500.,int(2))) + 100. )
         '''
 
+
+        HERE HERE HERE HERE
 
         mask,MASK = utils.getderivmask3((nsamples,nfolds))
 
