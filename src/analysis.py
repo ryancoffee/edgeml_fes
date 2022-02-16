@@ -101,7 +101,7 @@ class Params:
             beslogabs = besgrp.create_group('logabs')
             besdirectional = besgrp.create_group('directional').attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[detkey])/500.,int(2))) + 100.)
             bespop = besgrp.create_group('pop')
-            besloc = ecegrp.create_group('loc')
+            besloc = besgrp.create_group('loc')
             besloc.create_group('R')
             besloc.create_group('Z')
             bessign = besgrp.create_group('sign')
