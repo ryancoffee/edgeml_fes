@@ -91,12 +91,20 @@ class Params:
             eceorig = ecegrp.create_group('orig')
             ecelogabs = ecegrp.create_group('logabs')
             ecedirectional = ecegrp.create_group('directional').attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[detkey])/500.,int(2))) + 100.)
+            eceloc = ecegrp.create_group('loc')
+            eceloc.create_group('R')
+            eceloc.create_group('time')
+            ecesign = ecegrp.create_group('sign')
         if detkey == 'bes':
             besgrp = f[detkey]
             besorig = besgrp.create_group('orig')
             beslogabs = besgrp.create_group('logabs')
             besdirectional = besgrp.create_group('directional').attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[detkey])/500.,int(2))) + 100.)
             bespop = besgrp.create_group('pop')
+            besloc = ecegrp.create_group('loc')
+            besloc.create_group('R')
+            besloc.create_group('Z')
+            bessign = besgrp.create_group('sign')
         return self
 
 
@@ -121,9 +129,12 @@ class Params:
             self.chan[det] = -1
             return False
         if m.group(1)=='ece' or m.group(1)=='bes':
-            self.chan[det] = np.uint8(m.group(2))
+            self.chan[det] = np.uint8(m.group(2))-1 # accommodating the historical counting from 1
             print('shot%i\tdet:%s\tpid%i\t%s\t%s\t%ix%i'%(self.shot,det,os.getpid(),m.group(0),self.chan[det],self.nsamples[det],self.nfolds[det]))
         return True
+
+    def getChan(self,det):
+        return self.chan[det]
 
     def setOrig(self,f,det,d):
         f[det]['orig'].create_dataset('%02i'%self.chan[det],data=d.astype(np.float16),dtype=np.float16)
@@ -131,6 +142,10 @@ class Params:
 
     def setLogAbs(self,f,det,d):
         f[det]['logabs'].create_dataset('%02i'%self.chan[det],data=d.astype(np.float16),dtype=np.float16)
+        return self
+
+    def setSignBool(self,f,det,d):
+        f[det]['sign'].create_dataset('%02i'%self.chan[det],data=d.astype(bool),dtype=bool)
         return self
 
     def setDirectional(self,f,det,d):
@@ -141,10 +156,17 @@ class Params:
         f[det]['pop'].create_dataset('%02i'%self.chan[det],data=d.astype(np.float16),dtype=np.float16)
         return self
 
+    def setLocR(self,f,det,d):
+        f[det]['loc']['R'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
+        return self
 
+    def setLocTime(self,f,det,d):
+        f[det]['loc']['time'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
+        return self
 
-
-
+    def setLocZ(self,f,det,d):
+        f[det]['loc']['Z'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
+        return self
 
 
 
@@ -171,8 +193,6 @@ def run_shot(params):
     params.setExtrema(dets)
     params.fillIndsCoince(dets)
     params.setFolds(dets)
-    print(data['bes']['loc.R'])
-    print(data['bes']['loc.Z'])
 
     print('shot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.shot,params.sz['ece'],params.sz['bes'],(params.sz['bes']-2*params.sz['ece']),params.t['min'],params.t['max']))
 
@@ -195,6 +215,7 @@ def run_shot(params):
                     X = fft.dct(xx,axis=0)
                     X[0,:] = 0
                     AX = np.abs(X[::2,:])
+                    SX = (X[::2,:]>0)
                     if np.max(AX)==0:
                         continue
                     OUT = np.log2(AX+1)
@@ -204,6 +225,9 @@ def run_shot(params):
                     FOUT = 2**8 * fft.idct(qout*params.dct_filt[detkey],axis=0)[:params.nsamples[detkey],:]
 
                     params.setLogAbs(f,detkey,FOUT)
+                    params.setSignBool(f,detkey,SX)
+                    params.setLocR(f,detkey,data[detkey][chkey]['loc.R'])
+                    params.setLocTime(f,detkey,data[detkey][chkey]['loc.time'])
 
 
                     DFTOUT = np.fft.fft2(FOUT/(2**8))
@@ -232,6 +256,7 @@ def run_shot(params):
 
         print('BES nfolds*nsamples = %i * %i = %i'%(params.nfolds[detkey],params.nsamples[detkey],params.sz[detkey]))
 
+
         for chkey in params.chans[detkey]:
             if params.goodChanKey(chkey,detkey):
                 if data[detkey][chkey]['data.BES'].shape[0]>1:
@@ -241,7 +266,7 @@ def run_shot(params):
                     xx = np.row_stack((x,np.flip(x,axis=0)))
                     X = fft.dct(xx,axis=0)
 
-                    ##### ONLY UNIQUE SECTION ########
+                    ##### UNIQUE SECTION ########
                     elmpop = -fft.idst(X*params.dct_deriv_filt[detkey],axis=0) 
                     elmpop -= np.mean(elmpop)
                     params.setPop(f,detkey,elmpop[:params.nsamples[detkey],:])
@@ -249,15 +274,22 @@ def run_shot(params):
 
                     X[0,:] = 0 ####################### this also was only in ECE, but adding to BES for consistency... let's see.
                     AX = np.abs(X[::2,:])
+                    SX = (X[::2,:]>0)
                     if np.max(AX)==0:
                         continue
                     OUT = np.log2(AX+1)
                     OUT -= np.mean(OUT[-params.nsamples[detkey]//4:,:])
+                    OUT *= (OUT>0)
 
                     qout = fft.dct(np.row_stack((OUT,np.flip(OUT,axis=0))),axis=0)
                     FOUT = 2**8 * fft.idct(qout*params.dct_filt[detkey],axis=0)[:params.nsamples[detkey],:]
 
                     params.setLogAbs(f,detkey,FOUT)
+                    params.setSignBool(f,detkey,SX)
+                    
+                    chnum = params.getChan(detkey)
+                    params.setLocR(f,detkey,data[detkey]['loc.R'][chnum])
+                    params.setLocZ(f,detkey,data[detkey]['loc.Z'][chnum])
 
 
                     DFTOUT = np.fft.fft2(FOUT/(2**8))
