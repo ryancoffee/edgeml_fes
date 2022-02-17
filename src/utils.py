@@ -39,24 +39,22 @@ def dctLogic(s,inflate=1,nrolloff=128):
     DWAVE[:s.shape[0]] *= np.arange(s.shape[0],dtype=float)/s.shape[0] # producing the transform of the derivative
     return idct(WAVE)[:inflate*sz]*idst(DWAVE)[:inflate*sz]/(4*sz**2) # constructing the sig*deriv waveform 
 
-def scanedges(d,minthresh,expand=1):
-    tofs = []
-    slopes = []
+def scanedges(d,thresh=500,expand=1):
+    modes = []
     sz = d.shape[0]
-    i = 10
-    while i < sz-10:
-        while d[i] > minthresh:
+    i = 4
+    while i < sz-4:
+        while i<sz-4 and d[i] < thresh:
             i += 1
-        if i==sz-10: return tofs,slopes,len(tofs)
-        while i<sz-10 and d[i]<0:
+        if i==sz-4: return modes
+        while i<sz-4 and d[i]>0:
             i += 1
         start = i-1
         stop = i
         x0 = float(start) - (float(stop)-float(start))/float(d[stop]-d[start])*d[start]
         i += 1
-        tofs += [expand*float(x0)]
-        slopes += [float(d[stop]-d[start])/float(stop-start)] ## scaling to reign in the obscene derivatives... probably shoul;d be scaling d here instead
-    return tofs,slopes,len(tofs)
+        modes += [expand*float(x0)]
+    return modes
 
 def tanh(x,w):
     return 0.5*(1.+np.tanh(x/w))
