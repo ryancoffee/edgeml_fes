@@ -28,31 +28,28 @@ def main():
                     chanlist = list(f[det]['directional'].keys()) 
                     for chan in chanlist:
                         d = f[det]['directional'][chan][()]
-                        of[det].create_group(chan)
+                        chgrp = of[det].create_group(chan)
                         binfmtstr = '08b'
                         if expand >0:
                             binfmtstr = '0%ib'%(d.shape[0]*expand+4)
                         else:
                             binfmtstr = '0%ib'%(d.shape[0]//abs(expand)+4)
-                        print(binfmtstr)
                         barrays = {}
                         for v in range(d.shape[2]): # v for directional view
                             barrays[v] = []
                             for s in range(d.shape[1]): # s for time step
                                 result = 0b0
                                 if expand > 0:
-                                    edges = np.unique( utils.scanedges(d[:,s,v],thresh=300,expand=expand) ) # expand = 4, for ece this means edges run 0:2048 rather than original 0:512... bes would go to 4096
+                                    edges = np.unique( utils.scanedges(d[:,s,v],thresh=200,expand=expand) ) # expand = 4, for ece this means edges run 0:2048 rather than original 0:512... bes would go to 4096
                                 else:
-                                    tmp = utils.scanedges(d[:,s,v],thresh=300,expand=1) # expand = 4, for ece this means edges run 0:2048 rather than original 0:512... bes would go to 4096
+                                    tmp = utils.scanedges(d[:,s,v],thresh=200,expand=1) # expand = 4, for ece this means edges run 0:2048 rather than original 0:512... bes would go to 4096
                                     edges = np.unique( [int(v/abs(expand)) for v in tmp] )
 
                                 for e in edges:
                                     result += 2**int(e)
-                                    sparseout.append([int(e),s,v])
                                 barrays[v] += [format(result,binfmtstr)]
-                                print(m.group(1))
-                                of[det][chan].create_dataset('v%i'%v,data=)
                                 '''
+                                of[det][chan].create_dataset('v%i'%v,data=)
                                 for s in range(len(barrays[v])):
                                     of.write(barrays[v][s])
                                     of.write(os.linesep)
