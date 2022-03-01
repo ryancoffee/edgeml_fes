@@ -5,14 +5,19 @@ storebase = int(64)
 
 def encode(edges,sz):
     s = gmpy2.xmpz()
+    overcount = int(0)
     for e in edges:
-        s += 1<<int(e) #2**int(e)
+        if not s.bit_test(int(e)):
+            s.bit_set(int(e))
+        else:
+            overcount += 1
+        ##s += 1<<int(e) #2**int(e)
     nwords = sz//storebase
     wordlist = []
     for w in range(nwords):
         wordlist += [ np.uint64(gmpy2.t_mod_2exp(s,storebase)) ] ## [s%(2**storebase)]
         s = s >> storebase ## s /= 2**storebase
-    return wordlist
+    return wordlist,overcount
 
 def decode(s):
     l = gmpy2.xmpz()
