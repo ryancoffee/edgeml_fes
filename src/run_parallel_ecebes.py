@@ -16,6 +16,23 @@ parser.add_argument('-nsamples_bes',   type=int, default=1024,required=False, he
 parser.add_argument('-nsamples_ece',   type=int, default=512,required=False, help='Number of ece digitizer samples per DCT window')
 parser.add_argument('-shots',   type=int, nargs='+',required=True, help='Number of ece digitizer samples per DCT window')
 
+
+
+'''
+Joe Abbate  6:23 AM
+hey ryan sorry again for missing your email!
+￼
+￼
+￼
+￼
+￼
+6:24
+"Let me guess... you use the magnetics from slow sensors to reconstruct the location from which the cyclotron frequency was emitted corresponding to that ece channel. Since it's a slow variable, you only measure every 50 ms or so. The vector of values and times shows the location drift of the channel throughout the shot. Is that right? We would interpolate in order to assign the spectrogram patches that Alan is working with to a fixed location in the lab frame."
+6:25
+that's exactly right yup!
+
+'''
+
 def main():
     args, unparsed = parser.parse_known_args()
     if not len(args.shots) > 0:
