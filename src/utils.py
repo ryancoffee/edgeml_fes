@@ -4,6 +4,42 @@ import numpy as np
 from scipy.fftpack import dct,idct,idst
 from scipy import fft, stats
 
+def testBit(int_type, offset):
+    mask = 1 << offset
+    return(int_type & mask)
+
+def setBit(int_type, offset):
+    mask = 1 << offset
+    return(int_type | mask)
+
+def clearBit(int_type, offset):
+    mask = ~(1 << offset)
+    return(int_type & mask)
+
+def toggleBit(int_type, offset):
+    mask = 1 << offset
+    return(int_type ^ mask)
+
+def getSetBits(int_type):
+    s = []
+    i = 0
+    while int_type>0:
+        if (int_type & 1):
+            s += [i]
+        int_type >>= 1
+        i += 1
+    return s
+
+def mod2exp(int_type, offset):
+    return (int_type & ( (1<<int(offset)) - 1) )
+    #n % 2^i = n & (2^i - 1)
+'''
+        for (i=1, iter=1; i<256; i<<=1, iter++)
+        if (myvalue & i)
+            printf("Flag: %d set\n", iter);
+            '''
+
+
 class my_dct_f16:
     def __init__(sz):
         return self

@@ -3,6 +3,7 @@
 import h5py
 import numpy as np
 import utils
+import myEncodings
 import bitstring as bs
 import re
 import os
@@ -42,7 +43,7 @@ def runstep(params):
     chanlist = [params.d[step][c] for c in list( params.d[step].keys() ) ]
     for chan in chanlist:
         for direction in range(chan.shape[-1]):
-            print(utils.decode(chan[:][direction]) )
+            print(myEncodings.decode(chan[:][direction]) )
 
     return
 

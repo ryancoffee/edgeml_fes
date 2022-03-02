@@ -3,7 +3,7 @@
 import h5py
 import numpy as np
 import utils
-import encodings
+import myEncodings
 import bitstring as bs
 import re
 import os
@@ -31,19 +31,24 @@ def addsentences(story,d,args):
         print('step:\t%i'%step)
         paragraph = story.create_group('step_%06i'%step) #### Somehow need to use h5py.opaque_dtype() I think
         for chan in chanlist: ## for every sentence build the words
+            overcount = int(0)
             sentences = []
             for v in range(nviews): # for every word build the character string
                 if args.contract > 1:
                     tmp = utils.scanedges( d[chan][()][:,step,v] ,thresh=args.thresh,expand=1) 
                     # expand = 4, for ece this means edges run 0:2048 rather than original 0:512... bes would go to 4096
-                    edges = np.unique( [int(val/args.contract) for val in tmp] )
+                    edges = [int(val/args.contract) for val in tmp]
                 else:
-                    edges = np.unique( utils.scanedges( d[chan][()][:,step,v] ,thresh=args.thresh,expand=args.expand) )
-                words = encodings.encode( edges , sz=sz)  
+                    edges = utils.scanedges( d[chan][()][:,step,v] ,thresh=args.thresh,expand=args.expand) 
+                words,oc = myEncodings.encode( edges , sz=sz)  
+                overcount += oc
                 #print(len(words))
                 sentences += [words]
             ## now I have a sentence for every timestep
             paragraph.create_dataset('%s'%chan,data=np.stack(sentences,axis=-1),dtype=np.uint64) #### Somehow need to use h5py.opaque_dtype() I think
+            if overcount>0:
+                paragraph.attrs.create('overcount',data = overcount)
+                print(overcount)
     return story
 
 
