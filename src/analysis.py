@@ -9,167 +9,7 @@ from scipy import fft, stats
 import os
 import utils
 
-class Params:
-    def __init__(self,inpath,outpath,shot,nece=512,nbes=1024):
-        self.inpath = inpath
-        self.outpath = outpath
-        self.shot = shot
-        self.nsamples = {'ece':nece, 'bes':nbes}
-        self.t = {}
-        self.inds_coince = {}
-        self.sz = {}
-        self.nfolds = {}
-        self.dirthresh = {}
-        self.chans = {}
-        self.chan = {'ece':-1,'bes':-1}
-        self.mask = {}
-        self.MASK = {}
-        self.dct_filt = {}
-        self.dct_deriv_filt = {}
-
-    def setNsamples(self,s,n):
-        self.nsamples[s]=n
-        return self
-    def getNsamples(self,s):
-        return self.nsamples[s]
-
-    def initTimes(self,data,dets=['ece','bes']):
-        for det in dets:
-            self.chans[det] = list(data[det].keys())
-            self.t[det] = ((data[det][self.chans[det][0]]['data.time'] + 0.00025)*1e3).astype(int)
-        return self
-
-    def initChans(self,data,dets = ['ece','bes']):
-        for det in dets:
-            self.chans[det] = list(data[det].keys())
-            self.chan[det] = -1
-        return self
-
-    def setExtrema(self,dets):
-        self.t['min'] = np.max([np.min(self.t[d]) for d in dets])
-        self.t['max'] = np.min([np.max(self.t[d]) for d in dets])
-        return self
-
-    def initH5det(self,f,detkey):
-        dgrp = f.create_group(detkey)
-        dgrp.attrs.create('nfolds',self.nfolds[detkey])
-        dgrp.attrs.create('sz',self.sz[detkey])
-        dgrp.attrs.create('nsamples',self.nsamples[detkey])
-        return self
-
-    def fillH5times(self,f,detkey):
-        dgrp = f[detkey]
-        dgrp.create_dataset('times',data=self.t[detkey][self.inds_coince[detkey][0][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T)
-        return self
-
-    def fillIndsCoince(self,dets = ['ece','bes']):
-        for det in dets:
-            self.inds_coince[det] = np.where((self.t[det]>self.t['min']) * (self.t[det]<self.t['max']))
-            self.sz[det] = self.t[det][self.inds_coince[det]].shape[0]
-        return self
-
-    def setFolds(self,dets = ['ece','bes']):
-        for det in dets:
-            self.nfolds[det] = int(self.sz[det]//self.nsamples[det])
-            self.sz[det] = self.nfolds[det]*self.nsamples[det]
-        return self
-
-    def getSize(self,det = 'ece'):
-        return self.sz[det]
-
-    def setThresh(self,f,det = 'ece'):
-        if det == 'ece':
-            self.dirthresh[det] = 1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[det])/500.,int(2))) + 100. 
-        if det == 'bes':
-            self.dirthresh[det] = np.ones((self.nsamples[det],),dtype=np.float32)
-        f[det].create_dataset('directionThresh',data = self.dirthresh[det])
-        return self
-
-    def initH5datasets(self,f,detkey):
-        if detkey == 'ece':
-            ecegrp = f[detkey]
-            eceorig = ecegrp.create_group('orig')
-            ecelogabs = ecegrp.create_group('logabs')
-            ecedirectional = ecegrp.create_group('directional').attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[detkey])/500.,int(2))) + 100.)
-            eceloc = ecegrp.create_group('loc')
-            eceloc.create_group('R')
-            eceloc.create_group('time')
-            ecesign = ecegrp.create_group('sign')
-        if detkey == 'bes':
-            besgrp = f[detkey]
-            besorig = besgrp.create_group('orig')
-            beslogabs = besgrp.create_group('logabs')
-            besdirectional = besgrp.create_group('directional').attrs.create('threshold',1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[detkey])/500.,int(2))) + 100.)
-            bespop = besgrp.create_group('pop')
-            besloc = besgrp.create_group('loc')
-            besloc.create_group('R')
-            besloc.create_group('Z')
-            bessign = besgrp.create_group('sign')
-        return self
-
-
-
-    def initMasks(self,f,det):
-        self.mask[det],self.MASK[det] = utils.getderivmask3((self.nsamples[det],self.nfolds[det]))
-        f[det].create_dataset('mask', data = self.mask[det])
-        f[det].create_dataset('MASK', data = self.MASK[det])
-        return self
-
-    def buildFilt(self,f,det):
-        self.dct_filt[det] = utils.dct_buildfilt((2*self.nsamples[det],self.nfolds[det]),cut=(0,self.nsamples[det])) # remember, we need to mirror the nfolds dimension, thus the *2
-        f[det].create_dataset('dct_filt', data=self.dct_filt[det])
-        if det == 'bes':
-            self.dct_deriv_filt[det] = utils.dct_deriv_buildfilt((2*self.nsamples[det],self.nfolds[det]),cut=(0,self.nsamples[det])) # remember, we need to mirror the nfolds dimension, thus the *2
-            f[det].create_dataset('dct_deriv_filt', data = self.dct_deriv_filt[det])
-        return self
-
-    def goodChanKey(self,key,det):
-        m = re.search('^(\w{3}).{2}(\d+)$',key)
-        if not m:
-            self.chan[det] = -1
-            return False
-        if m.group(1)=='ece' or m.group(1)=='bes':
-            self.chan[det] = np.uint8(m.group(2))-1 # accommodating the historical counting from 1
-            print('shot%i\tdet:%s\tpid%i\t%s\t%s\t%ix%i'%(self.shot,det,os.getpid(),m.group(0),self.chan[det],self.nsamples[det],self.nfolds[det]))
-        return True
-
-    def getChan(self,det):
-        return self.chan[det]
-
-    def setOrig(self,f,det,d):
-        f[det]['orig'].create_dataset('%02i'%self.chan[det],data=d.astype(np.float16),dtype=np.float16)
-        return self
-
-    def setLogAbs(self,f,det,d):
-        f[det]['logabs'].create_dataset('%02i'%self.chan[det],data=d.astype(np.float16),dtype=np.float16)
-        return self
-
-    def setSignBool(self,f,det,d):
-        f[det]['sign'].create_dataset('%02i'%self.chan[det],data=d.astype(bool),dtype=bool)
-        return self
-
-    def setDirectional(self,f,det,d):
-        f[det]['directional'].create_dataset('%02i'%self.chan[det],data=d.astype(np.float16),dtype=np.float16)
-        return self
-
-    def setPop(self,f,det,d):
-        f[det]['pop'].create_dataset('%02i'%self.chan[det],data=d.astype(np.float16),dtype=np.float16)
-        return self
-
-    def setLocR(self,f,det,d):
-        f[det]['loc']['R'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
-        return self
-
-    def setLocTime(self,f,det,d):
-        f[det]['loc']['time'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
-        return self
-
-    def setLocZ(self,f,det,d):
-        f[det]['loc']['Z'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
-        return self
-
-
-
+#'BESFU', 'BESSU', 'ece', 'ecevs' the new channel names in shot files
 
 def run_shot(params):
 
@@ -177,22 +17,16 @@ def run_shot(params):
     outpath = params.outpath
     outfile = '%s/%s_dct.h5'%(outpath,params.shot)
 
-    data = {}
-    filename = {}
-    filename['ece'] = '%s/%i%s'%(params.inpath,params.shot,'ECE')
-    filename['bes'] = '%s/%i%s'%(params.inpath,params.shot,'BES')
+    filename = '%s/ecebes_%06i.h5'%(params.inpath,params.shot)
+    #filename['ece'] = '%s/%i%s'%(params.inpath,params.shot,'ECE')
+    #filename['bes'] = '%s/%i%s'%(params.inpath,params.shot,'BES')
     #data['ece'] = np.load(ecefile,allow_pickle=True)
     #data['bes'] = np.load(besfile,allow_pickle=True)
-    dets = ['ece','bes']
-    for det in dets:
-        data[det] = np.load(filename[det],allow_pickle=True)
-        print(list(data[det].keys()))
-
-    params.initTimes( data, dets )
-    params.initChans(data,dets)
-    params.setExtrema(dets)
-    params.fillIndsCoince(dets)
-    params.setFolds(dets)
+    dets = {'ece':'ecevs','bes':'BESFU'}
+    with h5py.File(filename,'r') as f:
+        params.initTimesChans(f,dets)
+        data = {}
+        data = params.fillData(f,dets,data)
 
     print('shot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.shot,params.sz['ece'],params.sz['bes'],(params.sz['bes']-2*params.sz['ece']),params.t['min'],params.t['max']))
 
