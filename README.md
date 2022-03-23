@@ -3,13 +3,15 @@ EdgeML for Fusion Energy
 
 ## Working notes
 Using sdf branch for updating `/src/run_parallel_ecebes.py`  
-Converting the scipy.fftpack.dct to the matrix version to check for performance improvement and also to use lower bit depth.
+Converting the scipy.fftpack.dct to the matrix version to check for performance improvement and also to use lower bit depth.  *Still in progress*
 
 ## DOE Program Support
 This project is funded by the US Department of Energy, Office of Science, Fusion Energy Science under Field Work Proposal FWP-100636 *Machine Learning for Real-time Fusion Plasma Behavior Prediction and Manipulation*
 
 # Running on SLAC SDF  
 First obtain an account and log into the SLAC SDF cluster login node via ```ssh```.  Make sure you have access to the saved pickel file for the ece and bes sampe shots in ```/gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/ecebes/```.  Please check out the docs for slurm on SLAC SDF at ```https://github.com/slaclab/sdf-docs/blob/master/batch-compute.md#interactive```.
+There is a new landing site for the data being pulled by Finn O'Shea, ```/sdf/group/ml/datasets/d3d_data/```.  There are currently nearly 1000 files there with a total of about 3/4 TB and it is still growing as the shots are pulled from DIII-D server.  *Thank you Finn!*  
+To use this dataset, I will need to refactor the spectrogram code to read in .h5 files rather than the previous pickle implementation.  I will preserve this pickle version as an alpha-release.
 
 ```bash
 ssh <uname>@sdf.slac.stanford.edu
@@ -19,6 +21,7 @@ git checkout sdf
 srun --x11 --partition ml -n 4 --time 0-03:00:00 --mem-per-cpu=200000 --pty /bin/bash
 module load slac-ml
 ls /gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/ecebes/
+ls /sdf/group/ml/datasets/d3d_data/
 python3 ./src/explore_ecebes_dct.py /gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/ecebes 122117 145387 174082 174084 174819 174823
 ```
 ... or to run the paramllel version  
