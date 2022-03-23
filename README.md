@@ -5,6 +5,12 @@ EdgeML for Fusion Energy
 Using sdf branch for updating `/src/run_parallel_ecebes.py`  
 Converting the scipy.fftpack.dct to the matrix version to check for performance improvement and also to use lower bit depth.  *Still in progress*
 
+On ece locations, including htis now(soon) in the .h5 conversion of pickle files:   
+From Joe Abbate  
+Joe: hey ryan sorry again for missing your email!
+ryan: "Let me guess... you use the magnetics from slow sensors to reconstruct the location from which the cyclotron frequency was emitted corresponding to that ece channel. Since it's a slow variable, you only measure every 50 ms or so. The vector of values and times shows the location drift of the channel throughout the shot. Is that right? We would interpolate in order to assign the spectrogram patches that Alan is working with to a fixed location in the lab frame."
+Joe: that's exactly right yup!
+
 ## DOE Program Support
 This project is funded by the US Department of Energy, Office of Science, Fusion Energy Science under Field Work Proposal FWP-100636 *Machine Learning for Real-time Fusion Plasma Behavior Prediction and Manipulation*
 
