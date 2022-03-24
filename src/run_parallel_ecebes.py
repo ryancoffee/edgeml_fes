@@ -5,7 +5,8 @@ import numpy as np
 import os.path
 import multiprocessing as mp
 #from joblib import Parallel, delayed
-from analysis import run_shot, Params
+from analysis import run_shot 
+from ParaClass import Params
 
 import argparse
 parser = argparse.ArgumentParser(description='Parallel converter from ece and bes pickle files to .h5 processed spectrograms\nmain -ipath <ipath> -opath <opath> -nthreads <nthreads> <shots separated by sapce>')
@@ -36,7 +37,7 @@ that's exactly right yup!
 def main():
     args, unparsed = parser.parse_known_args()
     if not len(args.shots) > 0:
-        print('No shots listed\nsyntax: main -ipath <ipath> -opath <opath> -nthreads <nthreads> -shots <shots separated by sapce>\nProgram exiting ... ... ')
+        print('No shots listed\nsyntax: main -ipath <ipath> -opath <opath> -shots <shots separated by sapce>\nProgram exiting ... ... ')
         exit(0)
     print(args.shots)
 
@@ -48,11 +49,12 @@ def main():
         os.makedirs(args.opath)
 
 
+    _= [print('Initializing shot\t%i'%shot) for shot in args.shots ]
     paramslist = [Params(args.ipath,args.opath,shot,nece=args.nsamples_ece,nbes=args.nsamples_bes) for shot in args.shots]
-    #_ = [p.setnsamples_ece(args.nsamples_ece).setnsamples_bes(args.nsamples_bes) for p in paramslist]
+    for i,p in enumerate(paramslist):
+        p.setThreadID(i)
 
-    num_cores = mp.cpu_count()
-    print(num_cores)
+    print('CPU cores:\t%i'%mp.cpu_count())
 
     with mp.Pool(processes=len(paramslist)) as pool:
         pool.map(run_shot,paramslist)

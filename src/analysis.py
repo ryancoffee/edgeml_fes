@@ -18,30 +18,27 @@ def run_shot(params):
     outfile = '%s/%s_dct.h5'%(outpath,params.shot)
 
     filename = '%s/ecebes_%06i.h5'%(params.inpath,params.shot)
-    #filename['ece'] = '%s/%i%s'%(params.inpath,params.shot,'ECE')
-    #filename['bes'] = '%s/%i%s'%(params.inpath,params.shot,'BES')
-    #data['ece'] = np.load(ecefile,allow_pickle=True)
-    #data['bes'] = np.load(besfile,allow_pickle=True)
     dets = {'ece':'ecevs','bes':'BESFU'}
+    data = {}
+
     with h5py.File(filename,'r') as f:
         params.initTimesChans(f,dets)
-        data = {}
         data = params.fillData(f,dets,data)
 
-    print('shot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.shot,params.sz['ece'],params.sz['bes'],(params.sz['bes']-2*params.sz['ece']),params.t['min'],params.t['max']))
+    print('pid%i\tshot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.getProcID(),params.shot,params.sz['ece'],params.sz['bes'],(params.sz['bes']-2*params.sz['ece']),params.t['min'],params.t['max']))
 
+    return
     with h5py.File(outfile,'w') as f:
         #################### ECE section #########################3#
-        detkey = 'ece'
 
+        detkey = 'ece'
         params.initH5det(f,detkey).fillH5times(f,detkey).setThresh(f,detkey)
         print('ECE nfolds*nsamples = %i * %i = %i'%(params.nfolds['ece'],params.nsamples['ece'],params.nfolds['ece']*params.nsamples['ece']))
         params.initH5datasets(f,detkey).initMasks(f,detkey).buildFilt(f,detkey)
         ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
         for chkey in params.chans[detkey]:
-            if params.goodChanKey(chkey,detkey):
-                if data[detkey][chkey]['data.ECE'].shape[0]>1:
+            if data[detkey][chkey].shape[0]>1:
                     x = data[detkey][chkey]['data.ECE'][params.inds_coince[detkey][0][:params.sz[detkey]]].reshape(params.nfolds[detkey],params.nsamples[detkey]).T
                     params.setOrig(f,detkey,x) # will cast as np.float16
 
@@ -74,11 +71,6 @@ def run_shot(params):
 
         ############### BES section ################
 
-        ############################################
-        ####### thing to add is loc.R and .Z #######
-        ####### this is presumably where the #######
-        ####### channels are located ###############
-        ############################################
 
         detkey = 'bes'
 

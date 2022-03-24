@@ -4,6 +4,7 @@ import re
 import numpy as np
 import utils
 import gc
+import os
 
 #'BESFU', 'BESSU', 'ece', 'ecevs' the new channel names in shot files
 
@@ -26,6 +27,17 @@ class Params:
         self.dct_filt = {}
         self.dct_deriv_filt = {}
         self.fails = {}
+        self.tid = -1
+
+    def getProcID(self):
+        return os.getpid()
+
+    def setThreadID(self,x):
+        self.tid = int(x)
+        return self
+
+    def getThreadID(self):
+        return self.tid
 
     def setNsamples(self,s,n):
         self.nsamples[s]=n
@@ -47,18 +59,16 @@ class Params:
         self.t['min'] = np.max([np.min(times[d]) for d in dets.keys()])
         self.t['max'] = np.min([np.max(times[d]) for d in dets.keys()])
         for d in dets.keys():
-            self.inds_coince[d] = np.where((times[d]>self.t['min']) * (times[d]<self.t['max']))
+            self.inds_coince[d] = np.where((times[d]>self.t['min']) * (times[d]<self.t['max']))[0]
             self.nfolds[d] = int(self.inds_coince[d].shape[0]//self.nsamples[d])
-            self.sz[d] = self.nfolds[det]*self.nsamples[det]
+            self.sz[d] = self.nfolds[d]*self.nsamples[d]
         del times
         gc.collect()
         return self
 
     def fillData(self,f,dets={'ece':'ecevs','bes':'BESFU'},data={}): # updated for Finn ecebes_######.h5 input files.
-        data = {}
         for d in dets.keys():
-            f[dets[d]]
-
+            data[d] = [(f[dets[d]][c][()]*(2**12)/10.).astype(np.int16) for c in self.chans[d]]
         return data
 
     def initH5det(self,f,detkey):
