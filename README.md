@@ -29,9 +29,9 @@ cd edgeml_fes
 git checkout sdf
 srun --x11 --partition ml -n 4 --time 0-03:00:00 --mem-per-cpu=200000 --pty /bin/bash
 module load slac-ml
-ls /gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/ecebes/
+ls /gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/d3d_output/
 ls /sdf/group/ml/datasets/d3d_data/
-python3 ./src/explore_ecebes_dct.py /gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/ecebes 122117 145387 174082 174084 174819 174823
+python3 ./src/run_parallel_ecebes.py -ipath /sdf/group/ml/datasets/d3d_data -opath /gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/d3d_ouptut/h5files -nthreads 2 -nsamples_bes 1024 -nsamples_ece 512 -shots 157817 157818 157819 157820
 ```
 ... or to run the paramllel version  
 ```bash

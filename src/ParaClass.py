@@ -79,8 +79,10 @@ class Params:
         return self
 
     def fillH5times(self,f,detkey):
-        dgrp = f[detkey]
-        dgrp.create_dataset('times',data=self.t[detkey][self.inds_coince[detkey][0][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T)
+        tgrp = f[detkey].create_group('t')
+        tgrp.attrs.create('min',self.t['min'])
+        tgrp.attrs.create('max',self.t['max'])
+        tgrp.attrs.create('step',self.tstep[detkey])
         return self
 
     def getSize(self,det = 'ece'):
