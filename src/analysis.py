@@ -29,15 +29,16 @@ def run_shot(params):
 
     with h5py.File(outfile,'w') as f:
 
+        params.initH5(f,dets)
+
         for detkey in dets.keys():
-            params.initH5det(f,detkey).fillH5times(f,detkey).setThresh(f,detkey).initH5datasets(f,detkey).initMasks(f,detkey).buildFilt(f,detkey)
             print('%s nfolds*nsamples = %i * %i = %i'%(detkey,params.nfolds[detkey],params.nsamples[detkey],params.nfolds[detkey]*params.nsamples[detkey]))
             print('len(data[%s]):\t%i'%(detkey,len(data[detkey])))
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for c in range(len(data[detkey])):
                 x = data[detkey][c][params.inds_coince[detkey][:params.sz[detkey]]].reshape(params.nfolds[detkey],params.nsamples[detkey]).T
-                params.setOrig(f,detkey,x) # will cast as np.float16
+                params.setOrig(f,detkey,c,x) # will cast as np.float16
 
                 xx = np.row_stack((x,np.flip(x,axis=0)))
                 X = fft.dct(xx,axis=0)
@@ -46,7 +47,7 @@ def run_shot(params):
                 if detkey == 'bes':
                     elmpop = -fft.idst(X*params.dct_deriv_filt[detkey],axis=0) 
                     elmpop -= np.mean(elmpop)
-                    params.setPop(f,detkey,elmpop[:params.nsamples[detkey],:])
+                    params.setPop(f,detkey,c,elmpop[:params.nsamples[detkey],:])
                 ##################################
 
                 X[0,:] = 0
@@ -64,14 +65,14 @@ def run_shot(params):
                 qout = fft.dct(np.row_stack((OUT,np.flip(OUT,axis=0))),axis=0)
                 FOUT = 2**8 * fft.idct(qout*params.dct_filt[detkey],axis=0)[:params.nsamples[detkey],:]
 
-                params.setLogAbs(f,detkey,FOUT)
-                params.setSignBool(f,detkey,SX)
+                params.setLogAbs(f,detkey,c,FOUT)
+                params.setSignBool(f,detkey,c,SX)
 
                 DFTOUT = np.fft.fft2(FOUT/(2**8))
                 NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(params.MASK[detkey])),dtype=float)
                 for i in range(len(params.MASK[detkey])):
                     NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*params.MASK[detkey][i]).real * FOUT
-                params.setDirectional(f,detkey,NEWOUT[:params.nsamples[detkey],:,:])
+                params.setDirectional(f,detkey,c,NEWOUT[:params.nsamples[detkey],:,:])
 
         #closing with h5py.File() as f
     return
