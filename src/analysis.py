@@ -73,6 +73,8 @@ def run_shot(params):
                 for i in range(len(params.MASK[detkey])):
                     NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*params.MASK[detkey][i]).real * FOUT
                 params.setDirectional(f,detkey,c,NEWOUT[:params.nsamples[detkey],:,:])
+                # setting words to the 
+                params.setWords(f,detkey,c,np.max(NEWOUT[:params.nsamples[detkey],:,:],axis=-1).astype(int),thresh=1000)
 
         #closing with h5py.File() as f
     return
