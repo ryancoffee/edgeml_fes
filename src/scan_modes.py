@@ -19,29 +19,93 @@ parser.add_argument('-contract', type=int, default=1,required=False,help='contra
 parser.add_argument('-infiles',   type=str, nargs='+',required=True, help='list of .h5 filenames')
 
 
-def addsentences(story,d,args):
-    chanlist = list(d.keys())
-    (nfreqs,nsteps,nviews) = d[chanlist[0]][()].shape
-    if args.contract > 1:
-        sz = np.uint16( max(64 , nfreqs // args.contract) )
-    else:
-        sz = np.uint16(nfreqs*args.expand)
-    print(sz)
+def addsentences(inname,outname,args):
+    with h5py.File(inname,'r') as infile:     ## f as infilehandle
+        nfreqs = {}
+        nsteps = {}
+        nviews = {}
+        sz = {}
+        d = {}
+        detlist = list(infile.keys())
+        for det in detlist:
+            chanlist[det] = list(infile[det]['directional'].keys())
+            (nf,ns,nv) = infile[det]['directional'][chanlist[0]][()].shape
+            nfreqs[det] = nf
+            nsteps[det] = ns
+            nviews[det] = nv
+        if args.contract > 1:
+            sz[det] = np.uint16( max(64 , nfreqs[det] // args.contract) )
+        else:
+            sz[det] = np.uint16(nfreqs[det]*args.expand)
+        print(sz['ece'],sz['bes'])
+        if nsteps['ece'] != nsteps['bes']:
+            print('failed nsteps[\'ece\'] != nsteps[\'bes\']')
+            return
+        for det in detlist:
+            d[det] = [infile[det]['directional'][chan][()] for chan in chanlist[det]]
+
+
+    outdata = {}
+    ecedata =  [d['ece'][ch] for ch in range(len(d['ece']))]
+    besdata =  [d['bes'][ch] for ch in range(len(d['bes']))]
+    paramslist = [StepParams(ecedata[:][:,step,:],besdata[:][:,step,:],outdata,nfreqs,nsteps,nviews,sz,step,split=0.1) for step in range(nsteps)] 
+    with mp.Pool(processes=len(paramslist)) as pool:
+        pool.map(addstep,paramslist)
+
+    with h5py.File(outname,'w') as outfile: 
+        for step in range(nsteps):
+            outfile.create_group('step_%06i'%step)
+
+
+class StepParams:
+    def __init__(self,ecedata,besdata,outdata,nfreqs,nsteps,nviews,step,split):
+        self.ecedata = ecedata
+        self.besdata = besdata
+        self.outdata = outdata
+        self.nchansece = len(ecedata)
+        self.nchansbes = len(besdata)
+        self.nfreqs = nfreqs
+        self.nviews = nviews
+        self.nsteps = nsteps
+        self.sz = sz
+        self.step = step
+        self.split = split
+
+    def nwords(self,detstr):
+        return self.sz[detstr]
+
+
+
+
+def addstep(params):
+    print('step:\t%i'%params.step)
+    outdata['step:\t%i'%params.step] = {}
+    ## for each detector 'ece' and 'bes' we need to create an (nchans,nview,nwords) 3D np array of uint64
+    params.outdata['ece'] = np.ndarray((params.ncahansece,params.nviews,params.nwordsece),dtype=np.uint64)
+    params.outdata['bes'] = np.ndarray((params.ncahansbes,params.nviews,params.nwordsbes),dtype=np.uint64)
+
+
+                        of.create_group(det)
+                        story = of[det].create_group('directional')
+                        d = f[det]['directional']
+HERE HERE HERE HERE somehow... catch back up.
+
     for step in range(nsteps):
-        print('step:\t%i'%step)
         paragraph = story.create_group('step_%06i'%step) #### Somehow need to use h5py.opaque_dtype() I think
         for chan in chanlist: ## for every sentence build the words
             overcount = int(0)
             sentences = []
             for v in range(nviews): # for every word build the character string
-                if args.contract > 1:
+                if params.contract > 1:
                     tmp = utils.scanedges( d[chan][()][:,step,v] ,thresh=args.thresh,expand=1) 
                     # expand = 4, for ece this means edges run 0:2048 rather than original 0:512... bes would go to 4096
-                    edges = [int(val/args.contract) for val in tmp]
+                    edges = [int(val/params.contract) for val in tmp]
                 else:
                     edges = utils.scanedges( d[chan][()][:,step,v] ,thresh=args.thresh,expand=args.expand) 
-                words,oc = myEncodings.encode( edges , sz=sz)  
-                overcount += oc
+                words['bes'],oc = myEncodings.encode( edges['bes'] , sz=sz['bes'])  
+                overcount['bes'] += oc
+                words['ece'],oc = myEncodings.encode( edges['ece'] , sz=sz['ece'])  
+                overcount['ece'] += oc
                 #print(len(words))
                 sentences += [words]
             ## now I have a sentence for every timestep
@@ -55,18 +119,13 @@ def addsentences(story,d,args):
 def main():
     args, unparsed = parser.parse_known_args()
     for fname in args.infiles: ## for every infilename
-        with h5py.File(fname,'r') as f:     ## f as infilehandle
             m = re.search('^.*/(\d+_\w+).h5$',fname)
             ofname = '%s.edges.h5'%(fname)
             if m:
                 ofname = '%s/%s.edges.h5'%(args.opath,m.group(1))
-                with h5py.File(ofname,'w') as of: 
-                    for det in ['ece','bes']:
-                        of.create_group(det)
-                        story = of[det].create_group('directional')
-                        d = f[det]['directional']
-                        story = addsentences(story,d,args)
+                    addsentences(inname,outname,args)
     return
+
 
 if __name__ == '__main__':
     main()

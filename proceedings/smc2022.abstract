@@ -1,0 +1,38 @@
+FYC.  Formatted for easy editing even though it kind of looks ugly.
+Authors:
+Finn O'Shea
+Surya Pathak supathak@redhat.com Red Hat Inc.
+Michael Clifford mcliffor@redhat.com Red Hat Inc.
+W. Leo Hoarty lhoarty@gmail.com 
+Ryan N. Coffee
+
+ 
+
+Title:
+Hierarchal Temporal Memory for Monitoring and Prediction in Tokamak Diagnostics
+
+ 
+
+Abstract:
+Dynamical system control requires that the history of the system be sufficiently informative that a control action to move the system towards a particular desired state can be taken in sufficient time to enact the control.
+One way to achieve this is to attempt future state forecasting with sufficient look ahead based on the recent system history.
+For systems with a rich temporal structure, as is the case for both speech recognition and tokamac plasma dynamics, prediction algorithms with memory can significantly outperform those without memory as indicated by the preponderance of recurrent neural networks (RNNs) in tuch cases verus deep neural networks.
+We discuss our experience with an alternative to RNN, the Hierarchal Temporal Memory (HTM) network.
+Such a network uses connections between members of the same layer to create a model-free prediction of the next element in a sequence.
+It learns by reducing the difference between the predicted forecast and the measured future state.
+This kind of learning can be performed completely online, an appropriate aspect for a forecasting algorithm for frequently changing dynamical systems.
+We describe out algorithmic architecuture for the HTM network as it predicts frames in multi-channel video-like diagnostics based on historical DIII-D tokamak data.
+We focus on the Beam Emission Spectroscopy and Electron Cyclotron Emission instruments, each of which is configured in a spatial pattern of 64 and 48 semi-independent channels respectively each with 1 and 0.5 MS/s sampling respectively.
+
+
+
+
+
+
+
+
+
+
+
+
+%comment out% In first-order control algorithms, the current state of the system is assumed to be sufficient for this purpose.

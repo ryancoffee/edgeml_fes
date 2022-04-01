@@ -19,10 +19,11 @@ parser.add_argument('-infiles',   type=str, nargs='+',required=True, help='list 
 
 
 
-class ConvertParams
-    def __init__(self,din,detin,stepin,split=float(0)):
-        self.d = d
-        self.det = detin
+class ConvertParams:
+    def __init__(self,ofile,dece,dbes,stepin,split=float(0)):
+        self.ofile = ofile
+        self.d_ece = dece
+        self.d_bes = dbes
         self.step = stepin
         self.split = split
         self.testflag = False
@@ -39,30 +40,33 @@ class ConvertParams
 
 def runstep(params):
     # _=[[[print(bin(d[k][()][i,j]) ) for j in range(d[k][()].shape[1]) ] for i in range(d[k][()].shape[0])] for k in list(d.keys())]
-    ## here, turn binary to one-hot encoding input to MLP autoencoder... define for TF the custom loss for binary distance
-    chanlist = [params.d[step][c] for c in list( params.d[step].keys() ) ]
+    ## here, turn binary to multi-hot encoding input to MLP autoencoder... define for TF the custom loss for binary distance
+    ## 
+    chanlist = [params.d_ece[step][c] for c in list( params.d_ece[step].keys() ) ]
     for chan in chanlist:
         for direction in range(chan.shape[-1]):
             print(myEncodings.decode(chan[:][direction]) )
-
     return
 
 def main():
+    args, unparsed = parser.parse_known_args()
+
     num_cores = mp.cpu_count()
     print("n_cores = %i"%(num_cores))
-    args, unparsed = parser.parse_known_args()
+
     for fname in args.infiles:
         with h5py.File(fname,'r') as infile:     ## f as infile handle
             m = re.search('^.*/(\d+_\w+.edges).h5$',fname)
             if m:
-                ofname_train = '%s/%s.train.h5'%(args.opath,m.group(1))
-                with h5py.File(ofname_train,'w') as oftrain: 
-                    for det in list(infile.keys()): # ['ece','bes']:
-                        det_train = oftrain.create_group(det)
-                        d = infile[det]['directional']
-                        paramslist = [ConvertParams(d,det,step,split=0.1) for step in list(d.keys())]
-                        with mp.Pool(processes=len(paramslist)) as pool:
-                            pool.map(runstep,paramslist)
+                ofname = '%s/%s.train.h5'%(args.opath,m.group(1))
+                with h5py.File(ofname,'w') as ofile: 
+                    #for det in list(infile.keys()): # ['ece','bes']:
+                    d_ece = infile['ece']['directional']
+                    d_bes = infile['bes']['directional']
+                    paramslist = [ConvertParams(d_ece,d_bes,step,split=0.1) for step in list(d.keys())]
+                    paramslist.outh5(ofile)
+                    with mp.Pool(processes=len(paramslist)) as pool:
+                        pool.map(runstep,paramslist)
     return
 
 if __name__ == '__main__':
