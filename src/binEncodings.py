@@ -1,4 +1,3 @@
-#import gmpy2
 import numpy as np
 from utils import testBit,setBit,getSetBits,mod2exp
 
@@ -23,27 +22,19 @@ def encode(edges,sz):
     return wordlist,overcount
 
 def decode(s):
-    #l = gmpy2.xmpz(0)
     l = int(0)
     for i,v in enumerate(s):
         l |= int(v) << (i*storebase)
-        #l |= gmpy2.xmpz(v) << (i*storebase)
-        #l += gmpy2.xmpz(v) << (i*storebase)
-    return getSetBits(l)  #list(l.iter_set())
+    return getSetBits(l) 
 
 def bindist(x,y): ## so far only returns the number of different bits, not related to the earth-movers distance yet
-    #X = gmpy2.xmpz(0)
-    #Y = gmpy2.xmpz(0)
     X = int(0)
     Y = int(0)
     for i,v in enumerate(x):
         X |= int(v)<<int(storebase*i)
-        #X += gmpy2.xmpz(v)<<int(storebase*i)
     for i,v in enumerate(y):
         Y |= int(v)<<int(storebase*i)
-        #Y += gmpy2.xmpz(v)<<int(storebase*i)
     d = X^Y
-    #d = gmpy2.xmpz(X^Y)
     return bin(d).count("1")
-    #return len( list(d.iter_set()) )
+
 
