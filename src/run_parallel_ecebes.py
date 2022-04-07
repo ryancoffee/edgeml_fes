@@ -15,7 +15,7 @@ parser.add_argument('-opath', type=str,required=True, help='ouput path')
 parser.add_argument('-nthreads',   type=int, default=4,required=False, help='Number of threads available, only parallelize of num shots though')
 parser.add_argument('-nsamples_bes',   type=int, default=1024,required=False, help='Number of bes digitizer samples per DCT window')
 parser.add_argument('-nsamples_ece',   type=int, default=512,required=False, help='Number of ece digitizer samples per DCT window')
-parser.add_argument('-shots',   type=int, nargs='+',required=True, help='Number of ece digitizer samples per DCT window')
+parser.add_argument('-shots',   type=int, nargs='+',required=True, help='Shot numbers to process')
 
 '''
 Joe Abbate  6:23 AM
