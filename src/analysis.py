@@ -4,7 +4,7 @@ import h5py
 import re
 #import cv2
 import numpy as np
-from scipy.fftpack import dct,idct,idst
+from scipy.fftpack import dct,dst
 from scipy import fft, stats
 import os
 import utils
@@ -38,19 +38,27 @@ def run_shot(params):
 
             for c in range(len(data[detkey])):
                 x = data[detkey][c][params.inds_coince[detkey][:params.sz[detkey]]].reshape(params.nfolds[detkey],params.nsamples[detkey]).T
+                if detkey == 'bes':
+                    if np.max(x)<5.:
+                        x *= 2.0
+                if detkey == 'ece':
+                    if np.max(x)<5.:
+                        x *= 6.0:
                 params.setOrig(f,detkey,c,x) # will cast as np.float16
 
                 xx = np.row_stack((x,np.flip(x,axis=0)))
-                X = fft.dct(xx,axis=0)
+                X = dct(xx,type=2,axis=0)
+                Y = dst(xx,type=2,axis=0)
 
                 ##### UNIQUE SECTION ########
                 if detkey == 'bes':
-                    elmpop = -fft.idst(X*params.dct_deriv_filt[detkey],axis=0) 
+                    elmpop = -dst(X*params.dct_deriv_filt[detkey],type=3,axis=0) + dct(Y*params.dct_deriv_filt[detkey],type=3,axis=0) 
                     elmpop -= np.mean(elmpop)
                     params.setPop(f,detkey,c,elmpop[:params.nsamples[detkey],:])
                 ##################################
 
                 X[0,:] = 0
+                
                 AX = np.abs(X[::2,:])
                 SX = (X[::2,:]>0)
                 if np.max(AX)==0:

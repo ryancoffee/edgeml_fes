@@ -68,7 +68,7 @@ class Params:
 
     def fillData(self,f,dets={'ece':'ecevs','bes':'BESFU'},data={}): # updated for Finn ecebes_######.h5 input files.
         for d in dets.keys():
-            data[d] = [(f[dets[d]][c][()]*(2**12)/10.).astype(np.int16) for c in self.chans[d]]
+            data[d] = [(int(f[dets[d]][c][()]*(2**12))>>3).astype(np.int16) for c in self.chans[d]]
         return data
 
     def initH5(self,f,dets):

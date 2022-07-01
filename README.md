@@ -1,8 +1,50 @@
 # edgeml\_fes
 EdgeML for Fusion Energy
+#File location 
+Finn has placed files into the Ml group spacs  
+```bash
+/sdf/group/ml/datasets
+" ============================================================================                                                                                                                                     
+" Netrw Directory Listing                                        (netrw v149)
+"   /sdf/group/ml/datasets/d3d_data
+"   Sorted by      name
+"   Sort sequence: [\/]$,\<core\%(\.\d\+\)\=\>,\.h$,\.c$,\.cpp$,\~\=\*$,*,\.o$,\.obj$,\.info$,\.swp$,\.bak$,\~$
+"   Quick Help: <F1>:help  -:go up dir  D:delete  R:rename  s:sort-by  x:exec
+" ============================================================================
+../
+./
+ecebes_156562.h5
+ecebes_156563.h5
+ecebes_156564.h5
+ecebes_156565.h5
+ecebes_156637.h5
+ecebes_156638.h5
+ecebes_156639.h5
+
+
+ecebes_176947.h5
+ecebes_176963.h5
+ecebes_176970.h5
+ecebes_176972.h5
+ecebes_176977.h5
+ecebes_176979.h5
+ecebes_176986.h5
+ecebes_176988.h5
+ecebes_176995.h5
+ecebes_176997.h5
+ecebes_177002.h5
+ecebes_177004.h5
+ecebes_177011.h5
+ecebes_177013.h5
+ecebes_177020.h5
+ecebes_177022.h5         
+```
+There are over 6000 files, each file is a shot.  Each shot has both ece and bes data (coarse and fine).
+The keys of these files are ```['BESFU', 'BESSU', 'ece', 'ecevs']```  of which we want the BESFU and ecevs
+
 
 ## Working notes
-Using sdf branch for updating `/src/run_parallel_ecebes.py`  
+Using sdf branch for updating ```/src/run_parallel_ecebes.py```
 Converting the scipy.fftpack.dct to the matrix version to check for performance improvement and also to use lower bit depth.  *Still in progress*
 Times I will convert to np.uint32 represented in microseconds. Later this will become 1/4 microseconds to accommodate eventual higher sample rate ADCs.  
 
