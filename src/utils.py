@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import numpy as np
-from scipy.fftpack import dct,idct,idst
+from scipy.fftpack import dct,idct,dst,idst
 from scipy import fft, stats
 
 def testBit(int_type, offset):
@@ -40,22 +40,38 @@ def mod2exp(int_type, offset):
             '''
 
 
-class my_dct_f16:
-    def __init__(sz):
-        return self
+
+class matTrans:
+    def __init__(self,sz):
+        self.sz=sz
+        return 
     def fill_dct_matrix(self):
-        u = np.ones((sz),dype=np.float16)*np.float16(np.sqrt(2./sz))
-        u[0] /= np.sqrt(2.)
-        i=2*np.arange(5).reshape(-1,1)+1
-        m = np.arange(5).reshape(1,-1)
-        argmat = i.dot(m).T.dot((x*u).reshape(-1,1))
-        argmat = np.arange(sz,shape=(1,sz))
-        cmat = np.cos(np.pi/(2*sz) * argmat)
+        I = np.eye(self.sz*2)
+        self.dctMat = dct(I,type=2,axis=0)[::2,:self.sz]
         return self
     def fill_idct_matrix(self):
+        I = np.eye(self.sz*2)
+        self.idctMat = dct(I,type=3,axis=0)[:self.sz,::2]
+        return self
+    def fill_dst_matrix(self):
+        I = np.eye(self.sz*2)
+        self.dstMat = dst(I,type=2,axis=0)[1::2,:self.sz]
         return self
     def fill_idst_matrix(self):
+        I = np.eye(self.sz*2)
+        self.idstMat = dst(I,type=3,axis=0)[:self.sz,1::2]
         return self
+    def dct(self,x):
+        return np.dot(self.dctMat,x)
+    def idct(self,x):
+        return np.dot(self.idctMat,x)
+    def dst(self,x):
+        return np.dot(self.dstMat,x)
+    def idst(self,x):
+        return np.dot(self.idstMat,x)
+
+
+
 
 def precalc_dctLogic(dctmat,s,nrolloff=128):
 

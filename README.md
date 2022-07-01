@@ -19,7 +19,9 @@ This project is funded by the US Department of Energy, Office of Science, Fusion
 
 # Running on SLAC SDF  
 First obtain an account and log into the SLAC SDF cluster login node via ```ssh```.  Make sure you have access to the saved pickel file for the ece and bes sampe shots in ```/gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/ecebes/```.  Please check out the docs for slurm on SLAC SDF at ```https://github.com/slaclab/sdf-docs/blob/master/batch-compute.md#interactive```.
-There is a new landing site for the data being pulled by Finn O'Shea, ```/sdf/group/ml/datasets/d3d_data/```.  There are currently nearly 1000 files there with a total of about 3/4 TB and it is still growing as the shots are pulled from DIII-D server.  *Thank you Finn!*  
+There is a new landing site for the data being pulled by Finn O'Shea, ```/sdf/group/ml/datasets/d3d_data/ecebes_[176]*.h5```.  There are many more shots from ecebes_156562.h5 to ecebes_177022.h5.  The easiest way to find them is to vim the parent folder name ```vim /sdf/group/ml/datasets/d3d_data``` and look.
+
+There are currently nearly 1000 files there with a total of about 3/4 TB and it is still growing as the shots are pulled from DIII-D server.  *Thank you Finn!*  
 To use this dataset, I will need to refactor the spectrogram code to read in .h5 files rather than the previous pickle implementation.  I will preserve this pickle version as an alpha-release.
 
 ```bash
