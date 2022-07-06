@@ -42,9 +42,12 @@ def mod2exp(int_type, offset):
 
 
 class matTrans:
-    def __init__(self,sz):
-        self.sz=sz
+    sz = 1024
+    def __init__(self):
         return 
+    def setsz(self,s):
+        self.sz = s
+        return self
     def fill_dct_matrix(self):
         I = np.eye(self.sz*2)
         self.dctMat = dct(I,type=2,axis=0)[::2,:self.sz]
@@ -70,12 +73,12 @@ class matTrans:
     def idst(self,x):
         return np.dot(self.idstMat,x)
 
+    def fill_logic_matrix(self,nrollon=0,nrolloff=128):
+        rollon = 0.5*(1.-np.cos(np.arange(nrollon,dtype=float)*np.pi/float(nrollon)))
+        rolloff = 0.5*(1.+np.cos(np.arange(nrolloff,dtype=float)*np.pi/float(nrolloff)))
+        return self
 
 
-
-def precalc_dctLogic(dctmat,s,nrolloff=128):
-
-    return idct(WAVE)[:inflate*sz]*idst(DWAVE)[:inflate*sz]/(4*sz**2) # constructing the sig*deriv waveform 
 
 def dctLogic(s,inflate=1,nrolloff=128):
     rolloff_vec = 0.5*(1.+np.cos(np.arange(nrolloff,dtype=float)*np.pi/float(nrolloff)))
