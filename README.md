@@ -2,10 +2,12 @@
 EdgeML for Fusion Energy Science project  
 
 ## DOE-FES Support
-This project was supported by the US Department of Energy, Office of Science, Fusion Energy Science, under
+This work was supported by the Department of Energy, Office of Fusion Energy Science under Field Work Proposal 100636 "Machine Learning for Real-time Fusion Plasma Behavior Prediction and Manipulation."   
+This material is based upon work supported by the U.S. Department of Energy, Office of Science, Office of Fusion Energy Sciences, using the DIII-D National Fusion Facility, a DOE Office of Science user facility, under Award DE-FC02-04ER54698.  
+
 
 #File location 
-Finn has placed files into the Ml group spacs  
+Finn has placed files into the Ml group space  
 ```bash
 /sdf/group/ml/datasets
 " ============================================================================                                                                                                                                     
