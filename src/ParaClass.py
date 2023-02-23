@@ -31,6 +31,7 @@ class Params:
         self.mask = {}
         self.MASK = {}
         self.q_filt = {}
+        self.elm_filt = {}
         self.dct_deriv_filt = {}
         self.fails = {}
         self.tid = -1
@@ -109,7 +110,7 @@ class Params:
                 if detkey == 'ece':
                     if np.max(x)<5.:
                         x *= 6.0
-                Params.setOrig(h5out,detkey,chan,x) # will cast as np.float16
+                Params.setOrig(h5out,detkey,chan,data=x) # will cast as np.float16
                 xx = np.row_stack((x,np.flip(x,axis=0)))
                 X = dct(xx,type=2,axis=0)
                 Y = dst(xx,type=2,axis=0)
@@ -117,7 +118,7 @@ class Params:
                 if detkey == 'bes':
                     elmpop = -dst(X*self.dct_deriv_filt[detkey],type=3,axis=0) + dct(Y*self.dct_deriv_filt[detkey],type=3,axis=0) 
                     elmpop -= np.mean(elmpop)
-                    Params.setPop(h5out,detkey,chan,elmpop[:self.nsamples[detkey],:])
+                    Params.setPop(h5out,detkey,chan,data=elmpop[:self.nsamples[detkey],:])
                 ##################################
 
                 X[0,:] = 0
@@ -136,16 +137,16 @@ class Params:
                 qout = fft.dct(np.row_stack((OUT,np.flip(OUT,axis=0))),axis=0)
                 FOUT = (1<<8) * fft.idct(qout*self.q_filt[detkey],axis=0)[:self.nsamples[detkey],:]
 
-                Params.setLogAbs(h5out,detkey,chan,FOUT)
-                Params.setSignBool(h5out,detkey,chan,SX)
+                Params.setLogAbs(h5out,detkey,chan,data=FOUT)
+                Params.setSignBool(h5out,detkey,chan,data=SX)
 
                 DFTOUT = np.fft.fft2(FOUT/(1<<8))
                 NEWOUT = np.zeros((DFTOUT.shape[0],DFTOUT.shape[1],len(self.MASK[detkey])),dtype=float)
                 for i in range(len(self.MASK[detkey])):
                     NEWOUT[:,:,i] = np.fft.ifft2(DFTOUT*self.MASK[detkey][i]).real * FOUT
-                Params.setDirectional(h5out,detkey,chan,NEWOUT[:self.nsamples[detkey],:,:])
+                Params.setDirectional(h5out,detkey,chan,data=NEWOUT[:self.nsamples[detkey],:,:])
                 # setting words to the 
-                Params.setWords(h5out,detkey,chan,np.max(NEWOUT[:self.nsamples[detkey],:,:],axis=-1).astype(int),thresh=1000)
+                Params.setWords(h5out,detkey,chan,data=np.max(NEWOUT[:self.nsamples[detkey],:,:],axis=-1).astype(int),thresh=1000)
 
         return self
 
@@ -156,6 +157,8 @@ class Params:
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
+                if False and chan>3: #set False to True for quickly checing on bugs
+                    continue
                 print('working det %s channel %s'%(detkey,chan))
                 x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
                 if detkey == 'bes':
@@ -164,22 +167,21 @@ class Params:
                 if detkey == 'ece':
                     if np.max(x)<5.:
                         x *= 6.0
-                Params.setOrig(h5out,detkey,chan,x) # will cast as np.float16
+                Params.setOrig(h5out,detkey,chan,data=x) # will cast as np.float16
+                    
                 X = rfft(np.concatenate((x,np.flip(x,axis=0)),axis=0),axis=0,norm='backward')
                 self.maxfreq[detkey] = 1./(2.*self.tstep[detkey])
-                ##### UNIQUE SECTION ########
-                if detkey == 'bes':
-                    elmpop = irfft(X*1j*self.fft_deriv_filt[detkey],axis=0,norm='forward')
-                    elmpop -= np.mean(elmpop)
-                    Params.setPop(h5out,detkey,chan,elmpop[:self.nsamples[detkey],:])
-                ##################################
+                if detkey=='bes':
+                    ELMX = X*self.elm_filt[detkey]
+                    elm_back = irfft(ELMX,norm='forward')
+                    Params.setElm(h5out,detkey,chan,data=elm_back[:self.nsamples[detkey],:])
                 S = np.abs(X).real
-                Params.setSpect(h5out,detkey,chan,S)
+                Params.setSpect(h5out,detkey,chan,data=S)
                 Q = rfft(np.concatenate((S,np.flip(S,axis=0)),axis=0),axis=0,workers=-1)
                 Sback = irfft(Q*self.q_filt[detkey],axis=0)
                 dSback = irfft(Q*1j*self.q_filt[detkey],axis=0)
                 logic = Sback*dSback
-                Params.setLogic(h5out,detkey,chan,logic)
+                Params.setLogic(h5out,detkey,chan,data=logic)
                 e,s,ne = utils.scanedges(logic,expand=self.expand[detkey])
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
@@ -218,7 +220,11 @@ class Params:
             tgrp.attrs.create('step',self.tstep[dk])
             ## init datasetss
             self.q_filt[dk] = utils.buildfilt((self.nsamples[dk]+2,self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, we need to mirror the nsamples//2+1 dimension that results of rfft
-            f[dk].create_dataset('qfilter', data=self.q_filt[dk])
+            f[dk].create_dataset('qfilter', data=self.q_filt[dk][:,0])
+            if dk=='bes':
+                grp.create_group('elm')
+                self.elm_filt[dk] = utils.dderiv_buildfilt((self.nsamples[dk]+1,self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, we need to mirror for the (2*nsamples)//2+1 in rfft 
+                f[dk].create_dataset('elmfilter', data=self.elm_filt[dk][:,0])
         return self
 
 
@@ -274,27 +280,35 @@ class Params:
         return self.chan[det]
 
     @classmethod
-    def setOrig(cls,f,det,c,d):
+    def setOrig(cls,f,det,c,data):
         m = re.compile('orig')
         if not np.any([m.match(k) for k in f[det].keys()]):
             f[det].create_group('orig')
-        f[det]['orig'].create_dataset('%02i'%c,data=d.astype(np.float16),dtype=np.float16)
+        f[det]['orig'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
         return cls
 
     @classmethod
-    def setSpect(cls,f,det,c,d):
+    def setSpect(cls,f,det,c,data):
         m = re.compile('spect')
         if not np.any([m.match(k) for k in f[det].keys()]):
             f[det].create_group('spect')
-        f[det]['spect'].create_dataset('%02i'%c,data=d.astype(np.float16),dtype=np.float16)
+        f[det]['spect'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
         return cls
 
     @classmethod
-    def setLogic(cls,f,det,c,d):
+    def setLogic(cls,f,det,c,data):
         m = re.compile('logic')
         if not np.any([m.match(k) for k in f[det].keys()]):
             f[det].create_group('logic')
-        f[det]['logic'].create_dataset('%02i'%c,data=d.astype(np.float16),dtype=np.float16)
+        f[det]['logic'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
+        return cls
+
+    @classmethod
+    def setElm(cls,f,det,c,data):
+        m = re.compile('elm')
+        if not np.any([m.match(k) for k in f[det].keys()]):
+            f[det].create_group('elm')
+        f[det]['elm'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
         return cls
 
     @classmethod

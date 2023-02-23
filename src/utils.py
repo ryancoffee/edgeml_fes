@@ -247,21 +247,15 @@ def dderiv_buildfilt(shape,cut=(0,256)):
     filt = np.zeros(shape[0],dtype=float)
     if cut[0] > 0:
         cuton = cut[0]
-        FREQ = np.arange(int(cuton),int(cutoff))**2
-        filt[int(cuton):int(cutoff)] = FREQ*0.5*(1.+np.sin(np.pi*np.arange(int(cutoff-cuton))/float(cutoff-cuton)))
+        FREQ = np.arange(int(cuton),int(cutoff))
+        filt[int(cuton):int(cutoff)] = -1*FREQ*FREQ*0.5*(1.+np.sin(np.pi*np.arange(int(cutoff-cuton))/float(cutoff-cuton)))
     else:
-        FREQ = np.arange(int(cutoff))**2
-        filt[:int(cutoff)] = FREQ*0.5*(1.+np.cos(np.pi*FREQ/float(cutoff)))
+        FREQ = np.arange(int(cutoff))
+        filt[:int(cutoff)] = -1.*FREQ*FREQ*0.5*(1.+np.cos(np.pi*FREQ/float(cutoff)))
     return np.tile(filt,(shape[1],1)).T
 
-def buildfilt2d(shp,cutoffs=(256,512)):
-    filt = np.zeros(shp,dtype=float)
-    XX=np.tile(np.arange(cutoffs[0]),(cutoffs[1],1)).T
-    YY=np.tile(np.arange(cutoffs[1]),(cutoffs[0],1))
-    filt[:cutoffs[0],:cutoffs[1]] = 0.25*(2. + np.cos(np.pi*XX/float(cutoffs[0])) + np.cos(np.pi*YY/float(cutoffs[1])))
-    return filt
-
 def buildfilt(shape,cut=(0,256)):
+    cuton = cut[0]
     cutoff = cut[1]
     filt = np.zeros(shape[0],dtype=float)
     FREQ = np.arange(int(cutoff),dtype=float)
@@ -271,6 +265,13 @@ def buildfilt(shape,cut=(0,256)):
     else:
         filt[:int(cutoff)] = 0.5*(1.+np.cos(np.pi*FREQ/float(cutoff)))
     return np.tile(filt,(shape[1],1)).T
+
+def buildfilt2d(shp,cutoffs=(256,512)):
+    filt = np.zeros(shp,dtype=float)
+    XX=np.tile(np.arange(cutoffs[0]),(cutoffs[1],1)).T
+    YY=np.tile(np.arange(cutoffs[1]),(cutoffs[0],1))
+    filt[:cutoffs[0],:cutoffs[1]] = 0.25*(2. + np.cos(np.pi*XX/float(cutoffs[0])) + np.cos(np.pi*YY/float(cutoffs[1])))
+    return filt
 
 def getextrema(t1,t2):
     tmin = np.max([np.min(t1),np.min(t2)])

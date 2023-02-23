@@ -17,7 +17,7 @@ def run_shot(params):
     outpath = params.outpath
     outfile = '%s/%s_fft.h5'%(outpath,params.shot)
 
-    filename = '%s/ecebes_%06i.h5'%(params.inpath,params.shot)
+    filename = '%s/elm_data_%06i.h5'%(params.inpath,params.shot)
 
     with h5py.File(filename,'r') as f:
         params.initTimesChans(f)
