@@ -49,7 +49,7 @@ def main():
     _= [print('Initializing shot\t%i'%shot) for shot in args.shots ]
     paramslist = [Params(args.ipath,args.opath,shot,nece=args.nsamples_ece,nbes=args.nsamples_bes) for shot in args.shots]
     for i,p in enumerate(paramslist):
-        p.setThreadID(i)
+        p.setThreadID(i).setMethod('fft')
 
     print('CPU cores:\t%i'%mp.cpu_count())
 

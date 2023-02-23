@@ -5,6 +5,7 @@ import numpy as np
 import utils
 import gc
 import os
+from scipy.fft import rfft,irfft
 
 #'BESFU', 'BESSU', 'ece', 'ecevs' the new channel names in shot files
 
@@ -19,8 +20,8 @@ class Params:
         self.t = {}
         self.tstep = {}
         self.maxfreq = {}
-        self.inflate = {}
-        self.expand = {}
+        self.inflate = {'ece':1,'bes':1}
+        self.expand = {'ece':4,'bes':4}
         self.inds_coince = {}
         self.sz = {}
         self.nfolds = {}
@@ -61,31 +62,25 @@ class Params:
     def initTimesChans(self,f): # updated for Finn ecebes_######.h5 input files.
         print('%s'%f.keys())
         times = {}
-        for d in self.dets.keys():
-            times[d] = (f[d]['times'][()]*1e3+.26).astype(np.int32)
-            self.chans[d] = [k for k in f[d].keys() if re.search(self.dets[d],k)]
-            self.tstep[d] = times[d][1]-times[d][0]
+        for dk,d in self.dets.items():
+            print('dk,d = %s,%s'%(dk,d))
+            times[dk] = (f[d]['times'][()]*1e3+.26).astype(np.int32)
+            self.chans[dk] = [k for k in f[d].keys() if re.search(d,k)]
+            self.tstep[dk] = times[dk][1]-times[dk][0]
         self.t['min'] = np.max([np.min(times[d]) for d in self.dets.keys()])
         self.t['max'] = np.min([np.max(times[d]) for d in self.dets.keys()])
 
-        for d in self.dets.keys():
-            self.inds_coince[d] = np.where((times[d]>self.t['min']) * (times[d]<self.t['max']))[0]
-            self.nfolds[d] = int(self.inds_coince[d].shape[0]//self.nsamples[d])
-            self.sz[d] = self.nfolds[d]*self.nsamples[d]
+        for dk in self.dets.keys():
+            self.inds_coince[dk] = np.where((times[dk]>self.t['min']) * (times[dk]<self.t['max']))[0]
+            self.nfolds[dk] = int(self.inds_coince[dk].shape[0]//self.nsamples[dk])
+            self.sz[dk] = self.nfolds[dk]*self.nsamples[dk]
         del times
         gc.collect()
         return self
 
     def fillData(self,f): # updated for Finn ecebes_######.h5 input files.
-        print('%s'%f.keys())
-        for dk in self.dets.keys():
-            print('detkey = %s'%dk)
-            print('f[dk].keys()')
-            _= [print(chan) for chan in f[dk].keys()]
-            print('self.chans[dk]')
-            _= [print(chan) for chan in self.chans[dk]]
-            print('\n\n\nOK, now we are here!')
-            self.data[dk] = [(int(f[dk][c][()]*(1<<12))>>3).astype(np.int16) for c in self.chans[dk]]
+        for dk,d in self.dets.items():
+            self.data[dk] = [(f[d][c][()]*(1<<10)).astype(np.int16) for c in self.chans[dk]]
         return self
 
     def setMethod(self,x='fft'):
@@ -100,11 +95,10 @@ class Params:
         print('improper method chosen, valid: fft or dct')
         return self
 
-
     def processDCT(self,h5out):
         for detkey in self.dets.keys():
-            print('%s nfolds*nsamples = %i * %i = %i'%(detkey,params.nfolds[detkey],params.nsamples[detkey],params.nfolds[detkey]*params.nsamples[detkey]))
-            print('len(data[%s]):\t%i'%(detkey,len(data[detkey])))
+            print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
+            print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
@@ -121,7 +115,7 @@ class Params:
                 Y = dst(xx,type=2,axis=0)
                 ##### UNIQUE SECTION ########
                 if detkey == 'bes':
-                    elmpop = -dst(X*params.dct_deriv_filt[detkey],type=3,axis=0) + dct(Y*params.dct_deriv_filt[detkey],type=3,axis=0) 
+                    elmpop = -dst(X*self.dct_deriv_filt[detkey],type=3,axis=0) + dct(Y*self.dct_deriv_filt[detkey],type=3,axis=0) 
                     elmpop -= np.mean(elmpop)
                     Params.setPop(h5out,detkey,chan,elmpop[:self.nsamples[detkey],:])
                 ##################################
@@ -157,8 +151,8 @@ class Params:
 
     def processFFT(self,h5out):
         for detkey in self.dets.keys():
-            print('%s nfolds*nsamples = %i * %i = %i'%(detkey,params.nfolds[detkey],params.nsamples[detkey],params.nfolds[detkey]*params.nsamples[detkey]))
-            print('len(data[%s]):\t%i'%(detkey,len(data[detkey])))
+            print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
+            print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
@@ -174,22 +168,44 @@ class Params:
                 self.maxfreq[detkey] = 1./(2.*self.tstep[detkey])
                 ##### UNIQUE SECTION ########
                 if detkey == 'bes':
-                    elmpop = irfft(X*1j*params.fft_deriv_filt[detkey],axis=0,norm='forward')
+                    elmpop = irfft(X*1j*self.fft_deriv_filt[detkey],axis=0,norm='forward')
                     elmpop -= np.mean(elmpop)
                     Params.setPop(h5out,detkey,chan,elmpop[:self.nsamples[detkey],:])
                 ##################################
                 S = np.abs(X).real
+                print('S.shape[0] = %i,%i'%S.shape)
                 Params.setSpect(h5out,detkey,chan,S)
                 Q = rfft(np.concatenate((S,np.flip(S,axis=0)),axis=0),axis=0)
-                Sback = irfft(Q*q_filt[detkey],axis=0)
-                dSback = irfft(Q*1j*q_filt[detkey],axis=0)
+                print('Q.shape[0] = %i,%i'%Q.shape)
+                print('shapes seem to be continuing to grow... strange')
+                Sback = irfft(Q*self.q_filt[detkey],axis=0)
+                dSback = irfft(Q*1j*self.q_filt[detkey],axis=0)
                 logic = Sback*dSback
                 Params.setLogic(h5out,detkey,chan,logic)
                 e,s,ne = utils.scanedges(logic)
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 
+    def process(self,h5out):
+        if self.method=='fft':
+            return self.processFFT(h5out)
+        elif self.method=='dct':
+            return self.processDCT(h5out)
+        else:
+            print('no processing method (fft/dct) specified')
+        return self
+
+    def initH5(self,f):
+        if self.method=='fft':
+            return self.initH5_FFT(f)
+        elif self.method=='dct':
+            return self.initH5_DCT(f)
+        else:
+            print('no method specified for initializing h5out')
+        return self
+
     def initH5_FFT(self,f):
+        self.method = 'fft'
         for dk in self.dets.keys():
             grp = f.create_group(dk)
             grp.attrs.create('nfolds',self.nfolds[dk])
@@ -241,6 +257,7 @@ class Params:
                 self.dirthresh['ece'] = 1.e3*np.exp(-1.*np.power(np.arange(self.nsamples[dk])/500.,int(2))) + 100. 
             grp.create_dataset('directionThresh',data = self.dirthresh[dk])
         return self
+
 
     def getSize(self,det = 'ece'):
         return self.sz[det]

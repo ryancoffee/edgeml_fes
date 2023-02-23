@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
 import numpy as np
-from scipy.fftpack import dct,idct,dst,idst
-from scipy import fft, stats
+from scipy.fft import dct,idct,dst,idst
+import time
+
+rng = np.random.default_rng(time.time_ns()%(1<<8))
 
 def testBit(int_type, offset):
     mask = 1 << offset
@@ -38,7 +40,6 @@ def mod2exp(int_type, offset):
         if (myvalue & i)
             printf("Flag: %d set\n", iter);
             '''
-
 
 
 class matTrans:
@@ -94,22 +95,32 @@ def dctLogic(s,inflate=1,nrolloff=128):
     DWAVE[:s.shape[0]] *= np.arange(s.shape[0],dtype=float)/s.shape[0] # producing the transform of the derivative
     return idct(WAVE)[:inflate*sz]*idst(DWAVE)[:inflate*sz]/(4*sz**2) # constructing the sig*deriv waveform 
 
+def randomround(x:float,rng):
+    return (np.int64(x) + np.int64(x%1>rng.random()))
+
 def scanedges(d,thresh=500,expand=1):
-    modes = []
+    edges = []
+    slopes = []
+    nedges = []
     sz = d.shape[0]
-    i = 4
-    while i < sz-4:
-        while i<sz-4 and d[i] < thresh:
+    for j in range(d.shape[1]):
+        i = 4
+        while i < sz-4:
+            while i<sz-4 and d[i] < thresh:
+                i += 1
+            if i==sz-4: return modes
+            while i<sz-4 and d[i]>0:
+                i += 1
+            start = i-1
+            stop = i
+            x0 = float(stop) - float(d[stop])/float(d[stop]-d[stop-1])
             i += 1
-        if i==sz-4: return modes
-        while i<sz-4 and d[i]>0:
-            i += 1
-        start = i-1
-        stop = i
-        x0 = float(start) - (float(stop)-float(start))/float(d[stop]-d[start])*d[start]
-        i += 1
-        modes += [expand*float(x0)]
-    return modes
+            v = self.expand*float(x0)
+            e += [np.uint64(randomround(v,rng))] 
+            slopes += [d[stop]-d[stop-1]] 
+        nedges += [len(e)]
+        edges += [e]
+    return edges,slopes,nedges
 
 def tanh(x,w):
     return 0.5*(1.+np.tanh(x/w))

@@ -22,14 +22,12 @@ def run_shot(params):
     with h5py.File(filename,'r') as f:
         params.initTimesChans(f)
         print('entering fillData')
-        print(list(f['ece'].keys())[-10:])
         params.fillData(f)
 
     print('pid%i\tshot %i\tsz_ece = %i\tsz_bes = %i\tsz_bes-2*sz_ece = %i\ttmin,tmax = (%i,%i)'%(params.getProcID(),params.shot,params.sz['ece'],params.sz['bes'],(params.sz['bes']-2*params.sz['ece']),params.t['min'],params.t['max']))
 
     with h5py.File(outfile,'w') as o:
-
         params.initH5(o)
-        params.processFFT(o)
+        params.process(o)
         #closing with h5py.File() as f
     return
