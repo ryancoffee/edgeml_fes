@@ -156,6 +156,7 @@ class Params:
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
+                print('working det %s channel %s'%(detkey,chan))
                 x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
                 if detkey == 'bes':
                     if np.max(x)<5.:
@@ -173,16 +174,13 @@ class Params:
                     Params.setPop(h5out,detkey,chan,elmpop[:self.nsamples[detkey],:])
                 ##################################
                 S = np.abs(X).real
-                print('S.shape[0] = %i,%i'%S.shape)
                 Params.setSpect(h5out,detkey,chan,S)
-                Q = rfft(np.concatenate((S,np.flip(S,axis=0)),axis=0),axis=0)
-                print('Q.shape[0] = %i,%i'%Q.shape)
-                print('shapes seem to be continuing to grow... strange')
+                Q = rfft(np.concatenate((S,np.flip(S,axis=0)),axis=0),axis=0,workers=-1)
                 Sback = irfft(Q*self.q_filt[detkey],axis=0)
                 dSback = irfft(Q*1j*self.q_filt[detkey],axis=0)
                 logic = Sback*dSback
                 Params.setLogic(h5out,detkey,chan,logic)
-                e,s,ne = utils.scanedges(logic)
+                e,s,ne = utils.scanedges(logic,expand=self.expand[detkey])
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 
@@ -219,7 +217,7 @@ class Params:
             tgrp.attrs.create('max',self.t['max'])
             tgrp.attrs.create('step',self.tstep[dk])
             ## init datasetss
-            self.q_filt[dk] = utils.buildfilt((2*self.nsamples[dk],self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, we need to mirror the nsamples dimension, thus the *2
+            self.q_filt[dk] = utils.buildfilt((self.nsamples[dk]+2,self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, we need to mirror the nsamples//2+1 dimension that results of rfft
             f[dk].create_dataset('qfilter', data=self.q_filt[dk])
         return self
 
@@ -247,10 +245,10 @@ class Params:
             grp.create_dataset('mask', data = self.mask[dk])
             grp.create_dataset('MASK', data = self.MASK[dk])
             ## build filters and set thresh
-            self.q_filt[dk] = utils.buildfilt((2*self.nsamples[dk],self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, we need to mirror the nsamples dimension, thus the *2
+            self.q_filt[dk] = utils.buildfilt((2*self.nsamples[dk],self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, 2* nsamples since mirroring
             f[dk].create_dataset('q_filt', data=self.q_filt[dk])
             if dk == 'bes':
-                self.dct_deriv_filt[dk] = utils.deriv_buildfilt((2*self.nsamples[dk],self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, we need to mirror the nsamples dimension, thus the *2
+                self.dct_deriv_filt[dk] = utils.deriv_buildfilt((2*self.nsamples[dk],self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, 2* nsamples since mirroring
                 f[dk].create_dataset('dct_deriv_filt', data = self.dct_deriv_filt[dk])
                 self.dirthresh['bes'] = np.ones((self.nsamples[dk],),dtype=np.float32)
             if dk == 'ece':
@@ -300,7 +298,7 @@ class Params:
         return cls
 
     @classmethod
-    def setEdges(cls,f,det,c,d):
+    def setEdges(cls,f,det,c,data):
         ematch = re.compile('edges')
         lmatch = re.compile('locations')
         smatch = re.compile('slopes')
@@ -314,9 +312,9 @@ class Params:
         if not np.any([nmatch.match(k) for k in f[det]['edges'].keys()]):
             f[det]['edges'].create_group('nedges')
 
-        f[det]['edges']['locations'].create_dataset('%02i'%c,data=d[0].astype(np.uint32),dtype=np.uint32)
-        f[det]['edges']['slopes'].create_dataset('%02i'%c,data=d[1].astype(np.float16),dtype=np.float16)
-        f[det]['edges']['nedges'].create_dataset('%02i'%c,data=d[2].astype(np.uint8),dtype=np.uint8)
+        f[det]['edges']['locations'].create_dataset('%02i'%c,data=np.array(data[0]).astype(np.uint32),dtype=np.uint32)
+        f[det]['edges']['slopes'].create_dataset('%02i'%c,data=np.array(data[1]).astype(np.float16),dtype=np.float16)
+        f[det]['edges']['nedges'].create_dataset('%02i'%c,data=np.array(data[2]).astype(np.uint8),dtype=np.uint8)
         return cls
 
     @classmethod

@@ -98,28 +98,36 @@ def dctLogic(s,inflate=1,nrolloff=128):
 def randomround(x:float,rng):
     return (np.int64(x) + np.int64(x%1>rng.random()))
 
-def scanedges(d,thresh=500,expand=1):
+def scanedges(data,thresh=500,expand=1):
     edges = []
     slopes = []
     nedges = []
-    sz = d.shape[0]
-    for j in range(d.shape[1]):
+    sz = data.shape[0]
+    for j in range(data.shape[1]):
+        e = []
+        s = []
+        d = data[:,j]
         i = 4
         while i < sz-4:
             while i<sz-4 and d[i] < thresh:
                 i += 1
-            if i==sz-4: return modes
+            if i==sz-4: continue 
             while i<sz-4 and d[i]>0:
                 i += 1
             start = i-1
             stop = i
             x0 = float(stop) - float(d[stop])/float(d[stop]-d[stop-1])
             i += 1
-            v = self.expand*float(x0)
+            v = expand*float(x0)
             e += [np.uint64(randomround(v,rng))] 
-            slopes += [d[stop]-d[stop-1]] 
+            s += [d[stop]-d[stop-1]] 
         nedges += [len(e)]
-        edges += [e]
+        if len(edges)==0:
+            edges = e
+            slopes = s
+        else:
+            edges += e
+            slopes += s
     return edges,slopes,nedges
 
 def tanh(x,w):
