@@ -31,6 +31,7 @@ class Params:
         self.mask = {}
         self.MASK = {}
         self.q_filt = {}
+        self.dq_filt = {}
         self.elm_filt = {}
         self.dct_deriv_filt = {}
         self.fails = {}
@@ -151,22 +152,25 @@ class Params:
         return self
 
     def processFFT(self,h5out):
+        offset = 1<<4
         for detkey in self.dets.keys():
             print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
             print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
-                if False and chan>3: #set False to True for quickly checing on bugs
+                if True and (chan<10 or chan>15): #set False to True for quickly checing on bugs
+                    continue
+                if True and detkey=='bes': #set False to True for quickly turning off bes
                     continue
                 print('working det %s channel %s'%(detkey,chan))
                 x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
                 if detkey == 'bes':
                     if np.max(x)<5.:
-                        x *= 2.0
+                        x *= 2
                 if detkey == 'ece':
                     if np.max(x)<5.:
-                        x *= 6.0
+                        x *= 6
                 Params.setOrig(h5out,detkey,chan,data=x) # will cast as np.float16
                     
                 X = rfft(np.concatenate((x,np.flip(x,axis=0)),axis=0),axis=0,norm='backward')
@@ -177,12 +181,13 @@ class Params:
                     Params.setElm(h5out,detkey,chan,data=elm_back[:self.nsamples[detkey],:])
                 S = np.abs(X).real
                 Params.setSpect(h5out,detkey,chan,data=S)
-                Q = rfft(np.concatenate((S,np.flip(S,axis=0)),axis=0),axis=0,workers=-1)
-                Sback = irfft(Q*self.q_filt[detkey],axis=0)
-                dSback = irfft(Q*1j*self.q_filt[detkey],axis=0)
-                logic = Sback*dSback
+                Q = rfft(np.concatenate((S,np.flip(S,axis=0)),axis=0),axis=0)
+                Sback = irfft(Q*self.q_filt[detkey],axis=0).real.astype(float)
+                dSback = irfft(Q*1j*self.dq_filt[detkey],axis=0).real.astype(float)
+                #logic = (Sback[offset:self.nsamples[detkey],:]*dSback[offset:self.nsamples[detkey],:]).real.astype(float)
+                logic = (dSback[offset:self.nsamples[detkey],:]).real.astype(float)
                 Params.setLogic(h5out,detkey,chan,data=logic)
-                e,s,ne = utils.scanedges(logic,expand=self.expand[detkey])
+                e,s,ne = utils.scanedges(logic,thresh=5e6,expand=self.expand[detkey])
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 
@@ -219,8 +224,10 @@ class Params:
             tgrp.attrs.create('max',self.t['max'])
             tgrp.attrs.create('step',self.tstep[dk])
             ## init datasetss
-            self.q_filt[dk] = utils.buildfilt((self.nsamples[dk]+2,self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, we need to mirror the nsamples//2+1 dimension that results of rfft
+            self.q_filt[dk] = utils.buildfilt((self.nsamples[dk]+2,self.nfolds[dk]),cut=(0,self.nsamples[dk]>>2)) # remember, we need to mirror the nsamples//2+1 dimension that results of rfft
+            self.dq_filt[dk] = utils.deriv_buildfilt((self.nsamples[dk]+2,self.nfolds[dk]),cut=(1,self.nsamples[dk])) # remember, we need to mirror the nsamples//2+1 dimension that results of rfft
             f[dk].create_dataset('qfilter', data=self.q_filt[dk][:,0])
+            f[dk].create_dataset('dqfilter', data=self.dq_filt[dk][:,0])
             if dk=='bes':
                 grp.create_group('elm')
                 self.elm_filt[dk] = utils.dderiv_buildfilt((self.nsamples[dk]+1,self.nfolds[dk]),cut=(0,self.nsamples[dk])) # remember, we need to mirror for the (2*nsamples)//2+1 in rfft 
@@ -300,7 +307,7 @@ class Params:
         m = re.compile('logic')
         if not np.any([m.match(k) for k in f[det].keys()]):
             f[det].create_group('logic')
-        f[det]['logic'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
+        f[det]['logic'].create_dataset('%02i'%c,data=data,dtype=float)
         return cls
 
     @classmethod
