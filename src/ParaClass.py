@@ -159,7 +159,7 @@ class Params:
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
-                if True and (chan<10 or chan>15): #set False to True for quickly checing on bugs
+                if False and detkey=='ece' and (chan<10 or chan>40): #set False to True for quickly checing on bugs
                     continue
                 if True and detkey=='bes': #set False to True for quickly turning off bes
                     continue
@@ -187,7 +187,7 @@ class Params:
                 #logic = (Sback[offset:self.nsamples[detkey],:]*dSback[offset:self.nsamples[detkey],:]).real.astype(float)
                 logic = (dSback[offset:self.nsamples[detkey],:]).real.astype(float)
                 Params.setLogic(h5out,detkey,chan,data=logic)
-                e,s,ne = utils.scanedges(logic,thresh=5e6,expand=self.expand[detkey])
+                e,s,ne = utils.scanedges(logic,thresh=1e5,expand=self.expand[detkey])
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 
