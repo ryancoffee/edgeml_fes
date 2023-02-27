@@ -159,7 +159,7 @@ class Params:
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
-                if False and detkey=='ece' and (chan<10 or chan>40): #set False to True for quickly checing on bugs
+                if False and detkey=='ece' and (chan<10 or chan>20): #set False to True for quickly checing on bugs
                     continue
                 if True and detkey=='bes': #set False to True for quickly turning off bes
                     continue
@@ -225,7 +225,7 @@ class Params:
             tgrp.attrs.create('step',self.tstep[dk])
             ## init datasetss
             self.q_filt[dk] = utils.buildfilt((self.nsamples[dk]+2,self.nfolds[dk]),cut=(0,self.nsamples[dk]>>2)) # remember, we need to mirror the nsamples//2+1 dimension that results of rfft
-            self.dq_filt[dk] = utils.deriv_buildfilt((self.nsamples[dk]+2,self.nfolds[dk]),cut=(1,self.nsamples[dk])) # remember, we need to mirror the nsamples//2+1 dimension that results of rfft
+            self.dq_filt[dk] = utils.deriv_buildfilt((self.nsamples[dk]+2,self.nfolds[dk]),cut=(0,self.nsamples[dk]>>1)) # remember, we need to mirror the nsamples//2+1 dimension that results of rfft
             f[dk].create_dataset('qfilter', data=self.q_filt[dk][:,0])
             f[dk].create_dataset('dqfilter', data=self.dq_filt[dk][:,0])
             if dk=='bes':

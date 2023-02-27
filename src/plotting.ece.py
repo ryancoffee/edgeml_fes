@@ -17,7 +17,7 @@ def main(fnames):
         with h5py.File(fname,'r') as f:
             m = headmatch.match(fname)
             if m:
-                chankeys = ['%02i'%i for i in range(10,38,4)]
+                chankeys = ['%02i'%i for i in range(10,28,4)]
                 oname = '%s.ece.logic.png'%(m.group(1))
                 fig,axs = plt.subplots(len(chankeys),1,figsize=(12,12),sharex=True,sharey=True)        
                 _=[axs[i].imshow(f['ece']['logic'][k][()],vmin=-1e5,vmax=1e5,origin='lower') for i,k in enumerate(chankeys)]
@@ -38,7 +38,7 @@ def main(fnames):
                         hist[k] += [np.histogram(locations[k][a:a+n],bins=bins[k])[0]]
                 oname = '%s.ece.hist.png'%(m.group(1))
                 fig,axs = plt.subplots(len(chankeys),1,figsize=(12,12),sharex=True,sharey=True)        
-                _=[axs[i].imshow(np.array(hist[k]).T,vmin=0,vmax=1,origin='lower') for i,k in enumerate(chankeys)]
+                _=[axs[i].pcolor(np.array(hist[k]).T,vmin=0,vmax=1) for i,k in enumerate(chankeys)]
                 _=[axs[i].set_ylabel('qbins') for i in range(len(chankeys))]
                 plt.xlabel('time [ms]') 
                 plt.savefig(oname)

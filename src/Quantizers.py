@@ -25,7 +25,6 @@ class Quantizer:
             self.qbins = np.interp(yb,csum,(ubins[:-1]+ubins[1:])/2.)
         elif self.style=='fusion': # careful, this depends on the params.expand I believe
             ubins = np.arange(np.min(data),np.max(data)+1)
-            distro = 
 
         elif self.style=='bees': # careful, this depends on the params.expand I believe
             ubins = np.arange(np.min(data),np.max(data)+1)
