@@ -187,7 +187,7 @@ class Params:
                 #logic = (Sback[offset:self.nsamples[detkey],:]*dSback[offset:self.nsamples[detkey],:]).real.astype(float)
                 logic = (dSback[offset:self.nsamples[detkey],:]).real.astype(float)
                 Params.setLogic(h5out,detkey,chan,data=logic)
-                e,s,ne = utils.scanedges(logic,thresh=1e5,expand=self.expand[detkey])
+                e,s,ne = utils.scanedges(logic,thresh=1.5e5,expand=self.expand[detkey])
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 
