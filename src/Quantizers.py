@@ -15,14 +15,26 @@ class Quantizer:
     def __init__(self,style='nonuniform',nbins=1024):
         self.style:str = style
         self.nbins:np.uint32 = nbins
+        self.wave:bool = False
+        if style == 'wave':
+            self.wave = True
+        self.nbins:np.uint32 = nbins
         self.qbins:List[float] = []
 
-    def setbins(self,data):
+    def setbins(self,data,knob=0.0):
         if self.style=='nonuniform':
             ubins = np.arange(np.min(data),np.max(data)+1)
             csum = np.cumsum( np.histogram(data,bins=ubins)[0] )
             yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
             self.qbins = np.interp(yb,csum,(ubins[:-1]+ubins[1:])/2.)
+
+        elif self.style == 'santafe':
+            ubins = np.arange(np.min(data),np.max(data)+1)
+            h = np.histogram(data,bins=ubins)[0]
+            csum = np.cumsum( h.astype(float) + float(knob*np.mean(h)))
+            yb = np.arange(0,csum[-1],step=float(csum[-1])/float(self.nbins+1),dtype=float)
+            self.qbins = np.interp(yb,csum,(ubins[:-1]+ubins[1:])/2.)
+
         elif self.style=='fusion': # careful, this depends on the params.expand I believe
             ubins = np.arange(np.min(data),np.max(data)+1)
 
@@ -46,11 +58,44 @@ class Quantizer:
             csum = np.cumsum(distro)
             yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
             self.qbins = np.interp(yb,csum,B)
-        else: #self.style=='uniform':
+
+        elif self.style == 'wave':
+            if self.wave:
+                ubins = np.arange(data[0].shape[0]+1)
+                wave = np.mean(data,axis=0)
+                wave -= np.min(wave)
+                #plt.plot(wave)
+                #plt.show()
+                csum = np.cumsum(wave)
+                yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
+                self.qbins = np.interp(yb,csum,np.arange(csum.shape[0]))
+            else:
+                print('attempting to use waveform version of quantizer on non wave style.')
+
+        elif self.style == 'wave':
+            if self.wave:
+                ubins = np.arange(data[0].shape[0]+1)
+                wave = np.mean(data,axis=0)
+                wave -= np.min(wave)
+                #plt.plot(wave)
+                #plt.show()
+                csum = np.cumsum(wave)
+                yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
+                self.qbins = np.interp(yb,csum,np.arange(csum.shape[0]))
+            else:
+                print('attempting to use waveform version of quantizer on non wave style.')
+
+        elif self.style == 'uniform':
             mx = np.max(data)+1
             mn = np.min(data)
             self.qbins = np.arange(mn,mx,step=np.float(mx - mn)/np.float(self.nbins+1))
+
+        else:
+            print('no style for quantizqation specified')
         return self
+
+    def iswave():
+        return bool(self.wave)
 
     def getbin(self,e):
         b = 0
@@ -60,14 +105,28 @@ class Quantizer:
 
     def getnbins(self):
         return self.nbins
+
     def histogram(self,data):
-        return np.histogram(data,bins=self.qbins)[0]
+        if self.wave:
+            j = 0
+            h = np.zeros(self.qbins.shape[0]-1,dtype=float)
+            for i in range(self.qbins.shape[0]-2):
+                while j<self.qbins[i+1] and j<data.shape[0]:
+                    h[i] += data[j]  # / float(self.qbins[i+1]-self.qbins[i]) # keep it as the integral of signal inside the bin window... convert to probability later using the bins stored in .h5
+                    j+=1
+            return h
+        else:
+            return np.histogram(data,bins=self.qbins)[0]
+
     def bincenters(self):
         return (self.qbins[:-1] + self.qbins[1:])/2.0
     def binedges(self):
         return self.qbins
     def binwidths(self):
         return self.qbins[1:]-self.qbins[:-1]
+
+    def getstyle(self):
+        return self.style
 
     @classmethod
     def saveH5(cls,fname,klist,qdict):
