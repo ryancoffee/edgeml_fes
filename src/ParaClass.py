@@ -38,6 +38,7 @@ class Params:
         self.tid = -1
         self.method = 'fft'
         _ = [print('%s:%s'%(k,self.dets[k])) for k in self.dets.keys()]
+        self.satbits = 16
 
 
     def getProcID(self):
@@ -159,7 +160,7 @@ class Params:
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
-                if False and detkey=='ece' and (chan<10 or chan>20): #set False to True for quickly checing on bugs
+                if False and detkey=='ece' and (chan<10 or chan>25): #set False to True for quickly checking on bugs
                     continue
                 if True and detkey=='bes': #set False to True for quickly turning off bes
                     continue
@@ -179,15 +180,15 @@ class Params:
                     ELMX = X*self.elm_filt[detkey]
                     elm_back = irfft(ELMX,norm='forward')
                     Params.setElm(h5out,detkey,chan,data=elm_back[:self.nsamples[detkey],:])
-                S = np.abs(X).real
+                S = utils.saturate_uint(np.abs(X).real,self.satbits).astype(np.uint16)
                 Params.setSpect(h5out,detkey,chan,data=S)
-                Q = rfft(np.concatenate((S,np.flip(S,axis=0)),axis=0),axis=0)
-                Sback = irfft(Q*self.q_filt[detkey],axis=0).real.astype(float)
-                dSback = irfft(Q*1j*self.dq_filt[detkey],axis=0).real.astype(float)
-                #logic = (Sback[offset:self.nsamples[detkey],:]*dSback[offset:self.nsamples[detkey],:]).real.astype(float)
-                logic = (dSback[offset:self.nsamples[detkey],:]).real.astype(float)
+                Q = rfft(np.concatenate((S.astype(float),np.flip(S.astype(float),axis=0)),axis=0),axis=0)
+                Sback = utils.saturate_uint(irfft(Q*self.q_filt[detkey],axis=0).real,self.satbits).astype(np.uint16)
+                dSback = utils.saturate_int(irfft(Q*1j*self.dq_filt[detkey],axis=0).real.astype(int)>>6,self.satbits).astype(np.int16)
+                logic = dSback[offset:self.nsamples[detkey],:]
+                print(np.max(logic),np.min(logic))
                 Params.setLogic(h5out,detkey,chan,data=logic)
-                e,s,ne = utils.scanedges(logic,thresh=1.5e5,expand=self.expand[detkey])
+                e,s,ne = utils.scanedges(logic,thresh=1<<12,expand=self.expand[detkey])
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 
@@ -285,6 +286,7 @@ class Params:
 
     def getChan(self,det):
         return self.chan[det]
+
 
     @classmethod
     def setOrig(cls,f,det,c,data):

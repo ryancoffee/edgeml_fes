@@ -6,6 +6,18 @@ import time
 
 rng = np.random.default_rng(time.time_ns()%(1<<8))
 
+def saturate_uint(x,bits):
+    inds = np.where(x>((1<<bits)-1))
+    x[inds] = ((1<<bits)-1)
+    inds = np.where(np.sign(x) == -1)
+    x[inds] = 0
+    return x
+
+def saturate_int(x,bits):
+    inds = np.where(np.abs(x)>((1<<bits)-1))
+    x[inds] = ((1<<bits)-1)*np.sign(x[inds])
+    return x
+
 def testBit(int_type, offset):
     mask = 1 << offset
     return(int_type & mask)
