@@ -1,18 +1,27 @@
-# edgeml_fes
+# edgeml\_fes
 EdgeML for Fusion Energy Science project  
 
 ## DOE-FES Support
 This work was supported by the Department of Energy, Office of Fusion Energy Science under Field Work Proposal 100636 "Machine Learning for Real-time Fusion Plasma Behavior Prediction and Manipulation."   
 This material is based upon work supported by the U.S. Department of Energy, Office of Science, Office of Fusion Energy Sciences, using the DIII-D National Fusion Facility, a DOE Office of Science user facility, under Award DE-FC02-04ER54698.  
 
+
+When analysis is done, move files over to e.g. `/gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/d3d_output/h5files/` using s3dfdtn data transfer node.   
+The newwest data from d3d is actually being saved by Finn into `/sdf/group/ml/datasets/elm_data/`
  
 # Specifying shots to run
 Be careful.  It is easy to get a very long sequence to overfill a nodes cores...   
+
 ```bash
 shots=$(seq 170800 170824)
 shots=`echo $shots $(seq 170864 170897)`
-./src/run_parallel_ecebes.py -ipath /sdf/group/ml/datasets/elm_data/ -opath /scratch/coffee/edgeml_fes_data -nthreads 16 -nsamples_bes 1024 -nsamples_ece 512 -shots $shots
-```
+IPATH='/sdf/group/ml/datasets/elm_data/'
+OPATH='/scratch/coffee/edgeml_fes_data'
+mkdir -p $OPATH
+./src/run_parallel_ecebes.py -ipath $IPATH -opath $OPATH -nthreads 16 -nsamples_bes 1024 -nsamples_ece 512 -shots $shots
+```   
+Keep in mind, when we are qunantizing later, we will use no more than 256 bins for the non-uniform quantization.  
+The nsamples are chosen in order to give a 1ms time window per spectrogram.
 
 #File location 
 Finn has placed files into the Ml group space  

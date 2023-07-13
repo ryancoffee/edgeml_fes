@@ -5,6 +5,7 @@ import h5py
 import sys
 import re
 import matplotlib.pyplot as plt
+from Quantizers import Quantizer
 
 def main(nbins,fnames):
     allhits = {}
@@ -13,17 +14,17 @@ def main(nbins,fnames):
     chankeys = list(flist[0]['ece']['edges']['locations'].keys())
     for k in chankeys:
         allhits.update({k:[]})
-        allquants.update({k:Quantizer})
+        allquants[k] = Quantizer('fusion',nbins)
     for f in flist:
         for k in chankeys:
             allhits[k] += list(f['ece']['edges']['locations'][k][()])
     _=[f.close() for f in flist]
     
     for i,k in enumerate(chankeys):
-        h,b = np.histogram(allhits[k],nbins)
-        plt.plot((b[:-1]+b[1:])/2.,20*i+h)
-    plt.xlim(0,256)
-    plt.ylim(0,1e3)
+        h = allquants[k].histogram(allhits[k])
+        plt.plot(allquants[k].bincenters(),20*i+h)
+    #plt.xlim(0,256)
+    #plt.ylim(0,1e3)
     plt.show()
     return
 

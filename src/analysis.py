@@ -18,6 +18,9 @@ def run_shot(params):
     outfile = '%s/%s_fft.h5'%(outpath,params.shot)
 
     filename = '%s/elm_data_%06i.h5'%(params.inpath,params.shot)
+    if not os.path.exists(filename):
+        print('filename %s for shot %i missing'%(filename,params.shot))
+        return
 
     with h5py.File(filename,'r') as f:
         params.initTimesChans(f)

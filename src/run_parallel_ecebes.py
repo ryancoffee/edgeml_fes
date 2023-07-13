@@ -14,8 +14,8 @@ parser = argparse.ArgumentParser(description='Parallel converter from ece and be
 parser.add_argument('-ipath', type=str,required=True, help='input path')
 parser.add_argument('-opath', type=str,required=True, help='ouput path')
 parser.add_argument('-nthreads',   type=int, default=4,required=False, help='Number of threads available, only parallelize of num shots though')
-parser.add_argument('-nsamples_bes',   type=int, default=1024,required=False, help='Number of bes digitizer samples per DCT window')
-parser.add_argument('-nsamples_ece',   type=int, default=512,required=False, help='Number of ece digitizer samples per DCT window')
+parser.add_argument('-nsamples_bes',   type=int, default=1024,required=False, help='Number of bes digitizer samples per frequency window')
+parser.add_argument('-nsamples_ece',   type=int, default=512,required=False, help='Number of ece digitizer samples per frequency window')
 parser.add_argument('-shots',   type=int, nargs='+',required=True, help='Shot numbers to process')
 
 '''
@@ -34,7 +34,7 @@ that's exactly right yup!
 def main():
     args, unparsed = parser.parse_known_args()
     if not len(args.shots) > 0:
-        print('No shots listed\nsyntax: main -ipath <ipath> -opath <opath> -shots <shots separated by sapce>\nProgram exiting ... ... ')
+        print('No shots listed\nsyntax: main -ipath <ipath> -opath <opath> -shots <shots separated by space>\nProgram exiting ... ... ')
         exit(0)
     print(args.shots)
 
@@ -47,7 +47,7 @@ def main():
 
 
     _= [print('Initializing shot\t%i'%shot) for shot in args.shots ]
-    paramslist = [Params(args.ipath,args.opath,shot,nece=args.nsamples_ece,nbes=args.nsamples_bes) for shot in args.shots]
+    paramslist = [Params(args.ipath,args.opath,shot,nece=args.nsamples_ece,nbes=args.nsamples_bes) for shot in args.shots ]
     for i,p in enumerate(paramslist):
         p.setThreadID(i).setMethod('fft')
 
