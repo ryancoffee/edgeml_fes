@@ -188,7 +188,7 @@ class Params:
                 logic = dSback[offset:self.nsamples[detkey],:]
                 print(np.max(logic),np.min(logic))
                 Params.setLogic(h5out,detkey,chan,data=logic)
-                e,s,ne = utils.scanedges(logic,thresh=1<<12,expand=self.expand[detkey])
+                e,s,ne = utils.scanedges(logic,thresh=1<<11,expand=self.expand[detkey])
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 

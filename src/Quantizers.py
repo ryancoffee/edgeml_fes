@@ -36,9 +36,9 @@ class Quantizer:
             self.qbins = np.interp(yb,csum,(ubins[:-1]+ubins[1:])/2.)
 
         elif self.style=='fusion': # careful, this depends on the params.expand I believe
-            ubins = np.arange(1<<10+1) # again, be careful here
+            ubins = np.arange(np.min(data),np.max(data)+1)
             h = np.histogram(data,bins=ubins)[0]
-            csum = np.cumsum( h.astype(float) + 1.0)
+            csum = np.cumsum( h.astype(float) + 1.00)
             yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
             self.qbins = np.interp(yb,csum,(ubins[:-1]+ubins[1:])/2.)
 
