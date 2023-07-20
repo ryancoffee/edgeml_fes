@@ -153,7 +153,7 @@ class Params:
         return self
 
     def processFFT(self,h5out):
-        offset = 1<<4
+        offset = 0 #1<<4
         for detkey in self.dets.keys():
             print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
             print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
@@ -188,7 +188,7 @@ class Params:
                 logic = dSback[offset:self.nsamples[detkey],:]
                 print(np.max(logic),np.min(logic))
                 Params.setLogic(h5out,detkey,chan,data=logic)
-                e,s,ne = utils.scanedges(logic,thresh=1<<11,expand=self.expand[detkey])
+                e,s,ne = utils.scanedges(logic,thresh=1<<10,expand=self.expand[detkey])
                 Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 

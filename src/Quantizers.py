@@ -25,7 +25,7 @@ class Quantizer:
         if self.style=='nonuniform':
             ubins = np.arange(np.min(data),np.max(data)+1)
             csum = np.cumsum( np.histogram(data,bins=ubins)[0] )
-            yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
+            yb = np.arange(0,csum[-1],step=float(csum[-1])/(self.nbins+1))
             self.qbins = np.interp(yb,csum,(ubins[:-1]+ubins[1:])/2.)
 
         elif self.style == 'santafe':
@@ -39,7 +39,7 @@ class Quantizer:
             ubins = np.arange(np.min(data),np.max(data)+1)
             h = np.histogram(data,bins=ubins)[0]
             csum = np.cumsum( h.astype(float) + 1.00)
-            yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
+            yb = np.arange(0,csum[-1],step=float(csum[-1])/(self.nbins+1))
             self.qbins = np.interp(yb,csum,(ubins[:-1]+ubins[1:])/2.)
 
         elif self.style=='bees': # careful, this depends on the params.expand I believe
@@ -60,7 +60,7 @@ class Quantizer:
                 plt.title('power = %.3f'%theta[1])
                 plt.show()
             csum = np.cumsum(distro)
-            yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
+            yb = np.arange(0,csum[-1],step=float(csum[-1])/(self.nbins+1))
             self.qbins = np.interp(yb,csum,B)
 
         elif self.style == 'wave':
@@ -71,7 +71,7 @@ class Quantizer:
                 #plt.plot(wave)
                 #plt.show()
                 csum = np.cumsum(wave)
-                yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
+                yb = np.arange(0,csum[-1],step=float(csum[-1])/(self.nbins+1))
                 self.qbins = np.interp(yb,csum,np.arange(csum.shape[0]))
             else:
                 print('attempting to use waveform version of quantizer on non wave style.')
@@ -84,7 +84,7 @@ class Quantizer:
                 #plt.plot(wave)
                 #plt.show()
                 csum = np.cumsum(wave)
-                yb = np.arange(0,csum[-1],step=np.float(csum[-1])/(self.nbins+1))
+                yb = np.arange(0,csum[-1],step=float(csum[-1])/(self.nbins+1))
                 self.qbins = np.interp(yb,csum,np.arange(csum.shape[0]))
             else:
                 print('attempting to use waveform version of quantizer on non wave style.')
@@ -92,7 +92,7 @@ class Quantizer:
         elif self.style == 'uniform':
             mx = np.max(data)+1
             mn = np.min(data)
-            self.qbins = np.arange(mn,mx,step=np.float(mx - mn)/np.float(self.nbins+1))
+            self.qbins = np.arange(mn,mx,step=float(mx - mn)/float(self.nbins+1))
 
         else:
             print('no style for quantizqation specified')
