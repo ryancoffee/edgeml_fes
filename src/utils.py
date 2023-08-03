@@ -159,7 +159,10 @@ def scanedges(data,thresh=500,expand=1):
                 i += 1
             start = i-1
             stop = i
-            x0 = float(stop) - float(d[stop])/float(d[stop]-d[stop-1])
+            x0 = float(stop)
+            ds = d[stop]-d[stop-1]
+            if (ds != 0):
+                x0 -= float(d[stop])/float(ds)
             i += 1
             v = expand*float(x0)
             e += [np.uint64(randomround(v,rng))] 
