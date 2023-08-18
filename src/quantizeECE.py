@@ -72,7 +72,7 @@ def main(nbins,fnames):
                 a += ne[i]
         #shot = (re.search('.*\/(\d+)_.*\.h5',validfnames[j])).group(1)
         print('Writing shot_%i\tdata.shape = %s'%(shots[j],str(data.shape)))
-        with h5py.File('%s/quantized_data_shots%i-%i.h5'%(qpath,shot[0],shot[-1]),'a') as o:
+        with h5py.File('%s/quantized_data_shots%i-%i.h5'%(qpath,shots[0],shots[-1]),'a') as o:
             o.create_dataset('shot_%i'%shots[j],data=data)
             o.create_dataset('shot_%i_qbins'%shots[j],data=quant.binedges())
             if plotting:
