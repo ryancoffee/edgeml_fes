@@ -21,6 +21,15 @@ class Quantizer:
         self.nbins:np.uint32 = nbins
         self.qbins:List[float] = []
 
+    def setbins_from_hist(self,hist,ubins,knob=0.0):
+        if self.style=='fusion':
+            csum = np.cumsum(hist.astype(float) + float(knob)*float(np.mean(hist)))
+            yb = np.arange(0,csum[-1],step=float(csum[-1])/float(self.nbins+1))
+            self.qbins = np.interp(yb,csum,(ubins[:-1]+ubins[1:])/2.)
+        else:
+            print('setbins_from_hist() only implemented for style==fusion')
+        return self
+
     def setbins(self,data,knob=0.0):
         if self.style=='nonuniform':
             ubins = np.arange(np.min(data),np.max(data)+1)
@@ -62,19 +71,6 @@ class Quantizer:
             csum = np.cumsum(distro)
             yb = np.arange(0,csum[-1],step=float(csum[-1])/(self.nbins+1))
             self.qbins = np.interp(yb,csum,B)
-
-        elif self.style == 'wave':
-            if self.wave:
-                ubins = np.arange(data[0].shape[0]+1)
-                wave = np.mean(data,axis=0)
-                wave -= np.min(wave)
-                #plt.plot(wave)
-                #plt.show()
-                csum = np.cumsum(wave)
-                yb = np.arange(0,csum[-1],step=float(csum[-1])/(self.nbins+1))
-                self.qbins = np.interp(yb,csum,np.arange(csum.shape[0]))
-            else:
-                print('attempting to use waveform version of quantizer on non wave style.')
 
         elif self.style == 'wave':
             if self.wave:
