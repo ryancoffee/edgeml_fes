@@ -6,6 +6,21 @@ import time
 
 rng = np.random.default_rng(time.time_ns()%(1<<8))
 
+def selectchan(d,c):
+    assert c<d.shape[0]
+    return d[c,:,:]
+def sumchans(d):
+    return np.sum(d,axis=0)
+def sumtimes(d):
+    return np.sum(d,axis=2)
+def sumfreqs(d):
+    return np.sum(d,axis=1)
+def selecttimewin(d,t1,t2):
+    assert t1<t2
+    assert t2<d.shape[2]
+    return np.sum(d[:,:,t1:t2],axis=2)
+
+
 def saturate_uint(x,bits):
     inds = np.where(x>((1<<bits)-1))
     x[inds] = ((1<<bits)-1)
