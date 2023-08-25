@@ -19,6 +19,10 @@ def selecttimewin(d,t1,t2):
     assert t1<t2
     assert t2<d.shape[2]
     return np.sum(d[:,:,t1:t2],axis=2)
+def selectchanwin(d,c1,c2):
+    assert c1<c2
+    assert c2<d.shape[0]
+    return np.sum(d[c1:c2,:,:],axis=0)
 
 
 def saturate_uint(x,bits):
