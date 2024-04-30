@@ -5,6 +5,29 @@ EdgeML for Fusion Energy Science project
 This work was supported by the Department of Energy, Office of Fusion Energy Science under Field Work Proposal 100636 "Machine Learning for Real-time Fusion Plasma Behavior Prediction and Manipulation."   
 This material is based upon work supported by the U.S. Department of Energy, Office of Science, Office of Fusion Energy Sciences, using the DIII-D National Fusion Facility, a DOE Office of Science user facility, under Award DE-FC02-04ER54698.  
 
+# Example filenames in sdf filesystem accessed via s3df  
+Each file is aobut 80% of a GB.  Counting 158-187k of them at 1GB each would gives a max of 29 thousand of 1GB files would be 29 TB.  
+I believe there is heavy duplication in the "time" variable that I will check for future reference.  
+times are stored it seems as maybe 'f4', but I'm not sure this is a float4... 
+The minimum step size is just under .001 ms as stored and the values run from 0 to 5000 or so, so we can expand by 1000 to microseconds and use something bigger than 24 bits, so let's use 32 bits integer and multipy up by 1000 for the microsecond counts.  
+```
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_158000.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_159006.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_160013.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_161026.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_165012.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_166002.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_169000.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_170000.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_175002.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_176000.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_177000.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_179009.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_184001.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_185000.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_186000.h5
+/fs/ddn/sdf/group/ml/datasets/elm_data/elm_data_187014.h5
+```
 
 When analysis is done, move files over to e.g. `/gpfs/slac/staas/fs1/g/coffee_group/edgeml_fes_data/d3d_output/h5files/` using s3dfdtn data transfer node.   
 The newwest data from d3d is actually being saved by Finn into `/sdf/group/ml/datasets/elm_data/`
