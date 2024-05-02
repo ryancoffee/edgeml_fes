@@ -6,14 +6,17 @@ import sys
 import re
 import matplotlib.pyplot as plt
 from Quantizers import Quantizer
+import math
 
 plotting = False
 
 def main(nbins,fnames):
-    allhits = []
     flist = []
+    shots = []
     validfnames = []
     quant = Quantizer(style='fusion',nbins=nbins)
+    nunibins = 1<<10
+    nubinsshift = 0
 
     for fname in fnames:
         print(fname)
@@ -25,51 +28,57 @@ def main(nbins,fnames):
             print('fname %s failed to open'%fname)
 
 
-    #print("\n\n\tOK now trying to create a list of open files\n")
     for fname in validfnames:
-        #print(fname)
+        m = re.search('.*\/(\d+)_.+\.h5',fname)
+        if m:
+            shots += [int(m.group(1))]
         flist += [h5py.File(fname,'r')]
+        if (nubinsshift==0) and (flist[-1]['ece'].attrs['expand']>1):
+            nubinsshift = np.uint8(math.log2(flist[-1]['ece'].attrs['expand']))
 
     if len(flist)==0:
         print('no files worked')
         return
 
     chankeys = list(flist[0]['ece']['edges']['locations'].keys())
-    for f in flist:
-        for k in chankeys:
-            allhits += list(f['ece']['edges']['locations'][k][()])
+    '''
+    allhits_hist = {} 
+    for k in chankeys:
+        allhits_hist[k] = np.zeros((len(unibins)-1,),dtype=int)
+    '''
+    unibins = np.arange(nunibins<<nubinsshift,dtype=int)
+    allhits_hist = np.zeros((len(unibins)-1,),dtype=int)
 
-    quant.setbins(allhits)
+    nframes = []
+    for f in flist:
+        nframes += [f['ece']['edges']['nedges']['00'].shape[0]]
+        for k in chankeys:
+            allhits_hist += np.histogram(f['ece']['edges']['locations'][k][()],unibins)[0]
+
+    quant.setbins_from_hist(allhits_hist,unibins)
 
     if plotting:
-        #plt.plot(quant.bincenters(),1000.0/(0.01 + quant.binwidths()))
-        #plt.plot(quant.bincenters(),quant.histogram(allhits))
-        plt.stairs(10000.0/(0.01 + quant.binwidths()),quant.binedges())
-        plt.stairs(quant.histogram(allhits),quant.binedges())
+        plt.plot(quant.bincenters(),1000.0/(0.01 + quant.binwidths()))
         plt.show()
 
-    with h5py.File('./data.h5','w') as o:
-        for j,f in enumerate(flist):
-            data = np.zeros((len(chankeys),quant.nbins,10000))
-            for c,k in enumerate(chankeys):
-                ne = f['ece']['edges']['nedges'][k][()]
-                for i in range(len(ne)):
-                    a = np.sum(ne[:i])
-                    data[c,:,i] += quant.histogram(f['ece']['edges']['locations'][k][()][a:a+ne[i]])
-            shot = re.search('\/\d+_fft.h5',validfnames[j])
-            print(shot)
-            o.create_dataset(shot,data=data)
+    qpath = '/sdf/scratch/coffee/edgeml_fes_quantized'
+    for j,f in enumerate(flist):
+        data = np.zeros((len(chankeys),quant.nbins,nframes[j]),dtype=np.uint8)
+        for c,k in enumerate(chankeys):
+            ne = f['ece']['edges']['nedges'][k][()]
+            a = 0
+            for i in range(len(ne)):
+                data[c,:,i] += quant.histogram(f['ece']['edges']['locations'][k][()][a:a+ne[i]]).astype(np.uint8)
+                a += ne[i]
+        #shot = (re.search('.*\/(\d+)_.*\.h5',validfnames[j])).group(1)
+        print('Writing shot_%i\tdata.shape = %s'%(shots[j],str(data.shape)))
+        with h5py.File('%s/quantized_data_shots%i-%i.h5'%(qpath,shots[0],shots[-1]),'a') as o:
+            o.create_dataset('shot_%i'%shots[j],data=data)
+            o.create_dataset('shot_%i_qbins'%shots[j],data=quant.binedges())
             if plotting:
-                plt.pcolor(np.sum(data[10:13,:,:],axis=0))
+                plt.pcolor(np.sum(data,axis=0))
                 plt.colorbar()
-                plt.clim(0,2)
                 plt.show()
-            inds = np.where(data>0)
-            print(inds)
-            print(data[inds])
-            print(np.max(data))
-            print(data.shape)
-
 
     _=[f.close() for f in flist]
         

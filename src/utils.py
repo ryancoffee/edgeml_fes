@@ -6,6 +6,24 @@ import time
 
 rng = np.random.default_rng(time.time_ns()%(1<<8))
 
+def selectchan(d,c):
+    assert c<d.shape[0]
+    return d[c,:,:]
+def sumchans(d):
+    return np.sum(d,axis=0)
+def sumtimes(d):
+    return np.sum(d,axis=2)
+def sumfreqs(d):
+    return np.sum(d,axis=1)
+def selecttimewin(d,t1,t2):
+    assert t1<t2
+    assert t2<d.shape[2]
+    return np.sum(d[:,:,t1:t2],axis=2)
+def selectchanwin(d,c1,c2):
+    assert c1<c2
+    assert c2<d.shape[0]
+    return np.sum(d[c1:c2,:,:],axis=0)
+
 def soft_saturate(x,limit=10):
     return limit*np.tanh(x/limit)
 
@@ -162,7 +180,10 @@ def scanedges(data,thresh=500,expand=1):
                 i += 1
             start = i-1
             stop = i
-            x0 = float(stop) - float(d[stop])/float(d[stop]-d[stop-1])
+            x0 = float(stop)
+            ds = d[stop]-d[stop-1]
+            if (ds != 0):
+                x0 -= float(d[stop])/float(ds)
             i += 1
             v = expand*float(x0)
             e += [np.uint64(randomround(v,rng))] 
