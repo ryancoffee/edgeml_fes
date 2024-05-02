@@ -167,10 +167,10 @@ class Params:
                 print('working det %s channel %s'%(detkey,chan))
                 x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
                 if detkey == 'bes':
-                    if np.max(x)<5.:
+                    if np.max(x)<6.:
                         x *= 2
                 if detkey == 'ece':
-                    if np.max(x)<5.:
+                    if np.max(x)<6.:
                         x *= 6
                 Params.setOrig(h5out,detkey,chan,data=x) # will cast as np.float16
                     
@@ -372,17 +372,3 @@ class Params:
         f[det]['pop'].create_dataset('%02i'%c,data=d.astype(np.float16),dtype=np.float16)
         return cls
 
-    '''
-    def setLocR(self,f,det,d):
-        f[det]['loc']['R'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
-        return self
-
-    def setLocTime(self,f,det,d):
-        f[det]['loc']['time'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
-        return self
-
-    def setLocZ(self,f,det,d):
-        f[det]['loc']['Z'].create_dataset('%02i'%self.chan[det],data=d,dtype=np.float16)
-        return self
-
-    '''
