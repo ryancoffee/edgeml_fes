@@ -6,12 +6,14 @@ import utils
 import gc
 import os
 from scipy.fft import rfft,irfft
+import matplotlib.pyplot as plt
+from scipy import signal
 
 #'BESFU', 'BESSU', 'ece', 'ecevs' the new channel names in shot files
 
 class Params:
     def __init__(self,inpath,outpath,shot,nece=512,nbes=1024):
-        self.dets = {'ece':'ecevs','bes':'BESFU'}
+        self.dets = {'ece':'ece'}
         self.data = {}
         self.inpath = inpath
         self.outpath = outpath
@@ -68,8 +70,16 @@ class Params:
         for dk,d in self.dets.items():
             print('dk,d = %s,%s'%(dk,d))
             times[dk] = (f[d]['times'][()]*1e3+.26).astype(np.int32)
-            self.chans[dk] = [k for k in f[d].keys() if re.search(d,k)]
+            # print("fd.keys: ", f[d].keys()) 
+            # self.chans[dk] = []
+            # for k in f[d].keys():
+            #     print("d: ", d.upper(), " k: ", k)
+            #     if d.upper() in k:
+            #         print("found")
+            #         self.chans.append(k)
+            self.chans[dk] = [k for k in f[d].keys() if re.search(d,k, re.IGNORECASE)] #looks for 'ece' in the keys from the shot.h5 file
             self.tstep[dk] = times[dk][1]-times[dk][0]
+        #print("chans1", self.chans)
         self.t['min'] = np.max([np.min(times[d]) for d in self.dets.keys()])
         self.t['max'] = np.min([np.max(times[d]) for d in self.dets.keys()])
 
@@ -83,7 +93,12 @@ class Params:
 
     def fillData(self,f): # updated for Finn ecebes_######.h5 input files.
         for dk,d in self.dets.items():
-            self.data[dk] = [(f[d][c][()]*(1<<10)).astype(np.int16) for c in self.chans[dk]]
+            self.data[dk] = []
+            # print("chans: ", self.chans) 
+            for c in self.chans[dk]:
+                # print("c: ", c)
+                # self.data[dk].append(f[d][c][()].astype(np.int16))
+                self.data[dk].append((f[d][c][()]*(1<<10)).astype(np.int16))# for every channel , left bit shift
         return self
 
     def setMethod(self,x='fft'):
@@ -153,43 +168,61 @@ class Params:
         return self
 
     def processFFT(self,h5out):
+        print("inside process fft")
         offset = 0 #1<<4
         for detkey in self.dets.keys():
+            print("detector = ", detkey)
             print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
             print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
+                print("chan: ", chan)
                 if False and detkey=='ece' and (chan<10 or chan>25): #set False to True for quickly checking on bugs
                     continue
                 if True and detkey=='bes': #set False to True for quickly turning off bes
                     continue
                 print('working det %s channel %s'%(detkey,chan))
+                
+                # plt.plot(chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T.flatten('F'))
+                # plt.show()
+                
                 x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
-                if detkey == 'bes':
-                    if np.max(x)<6.:
-                        x *= 2
-                if detkey == 'ece':
-                    if np.max(x)<6.:
-                        x *= 6
+                
                 Params.setOrig(h5out,detkey,chan,data=x) # will cast as np.float16
-                    
+                # compute rfft on each column and the reverse of each column but due to transpose
+                # X = rfft(x,axis=0,norm='backward')
                 X = rfft(np.concatenate((x,np.flip(x,axis=0)),axis=0),axis=0,norm='backward')
                 self.maxfreq[detkey] = 1./(2.*self.tstep[detkey])
                 if detkey=='bes':
                     ELMX = X*self.elm_filt[detkey]
                     elm_back = irfft(ELMX,norm='forward')
                     Params.setElm(h5out,detkey,chan,data=elm_back[:self.nsamples[detkey],:])
+                # saturate the spectrogram and self.satbits = 16
                 S = utils.saturate_uint(np.abs(X).real,self.satbits).astype(np.uint16)
+                
+
+                # plt.imshow(S)
+                # plt.title(str(self.shot)+" "+str(chan))
+                # plt.gca().invert_yaxis()
+                # plt.show()
+                
                 Params.setSpect(h5out,detkey,chan,data=S)
-                Q = rfft(np.concatenate((S.astype(float),np.flip(S.astype(float),axis=0)),axis=0),axis=0)
-                Sback = utils.saturate_uint(irfft(Q*self.q_filt[detkey],axis=0).real,self.satbits).astype(np.uint16)
-                dSback = utils.saturate_int(irfft(Q*1j*self.dq_filt[detkey],axis=0).real.astype(int)>>6,self.satbits).astype(np.int16)
-                logic = dSback[offset:self.nsamples[detkey],:]
-                print(np.max(logic),np.min(logic))
-                Params.setLogic(h5out,detkey,chan,data=logic)
-                e,s,ne = utils.scanedges(logic,thresh=1<<10,expand=self.expand[detkey])
-                Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
+
+                overtones = self.findOvertones(S, minimum_peak_height=2000)
+                Params.setOvertones(h5out, detkey, chan , data=overtones)
+                
+                # Q = rfft(np.concatenate((S.astype(float),np.flip(S.astype(float),axis=0)),axis=0),axis=0)
+                # Sback = utils.saturate_uint(irfft(Q*self.q_filt[detkey],axis=0).real,self.satbits).astype(np.uint16)
+                # dSback = utils.saturate_int(irfft(Q*1j*self.dq_filt[detkey],axis=0).real.astype(int)>>6,self.satbits).astype(np.int16)
+                # logic = dSback[offset:self.nsamples[detkey],:]
+                # if chan == 4:
+                #     print("logic")
+                #     self.findOvertones(logic)
+                # print(np.max(logic),np.min(logic))
+                # Params.setLogic(h5out,detkey,chan,data=logic)
+                # e,s,ne = utils.scanedges(logic,thresh=1<<10,expand=self.expand[detkey])
+                # Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
         return self
 
     def process(self,h5out):
@@ -287,12 +320,77 @@ class Params:
     def getChan(self,det):
         return self.chan[det]
 
+    
+    @classmethod
+    def findOvertones(cls,spec, minimum_peak_height):
+        print(np.shape(spec.T))
+        col_indent = 0
+        peakWidths = np.zeros(len(spec.T))
+        for col_count, col in enumerate(spec.T[col_indent:]):
+            # if col_count %5 == 0:
+            #     continue
+            if col_count %200 == 0:
+                print("col count: ", col_count)
+            # plt.plot(col)
+            # plt.title("column "+str(col_indent+col_count)+" of fft")
+            # plt.show()
+            
+            # peaks = signal.find_peaks_cwt(col, 4.0, min_snr = 1)
+#             peaks = [count for count in range(len(col))]
+            
+#             #only copy points where a peak was observed and keep the rest 0
+#             onlyPeaks = np.zeros(len(col))
+#             for i in peaks:
+#                 if col[i] > minimum_peak_height:
+#                     onlyPeaks[i] = col[i]
+            onlyPeaks = col[:]
+            
+            onlyPeaks[onlyPeaks < minimum_peak_height] = 0
+            
+            
+            # plt.plot(onlyPeaks)
+            # plt.title("only peaks column "+str(col_indent+col_count)+" of fft")
+            # plt.show()
+            
+            spec_2 = rfft(onlyPeaks)
+            target = spec_2[0]*0.1
+            target_counter = 0
+            peak_width = 0
+            while (1):
+                if peak_width > 50:
+                    peak_width = 0
+                    break
+                elif spec_2[peak_width] <= target:
+                    target_counter +=1
+                    if target_counter >= 4:
+                        break
+                peak_width += 1
+            #print("col = ", col_indent+col_count, " peak_width: ", peak_width)
+            peakWidths[col_count] = peak_width
+            # plt.plot(spec_2.real)
+            # plt.show()
+        # plt.plot(peakWidths)
+        # plt.title("peak widths for every column")
+        # plt.show()
+        return peakWidths
+        
+    @classmethod
+    def setOvertones(cls, f, det, c , data):
+        m = re.compile('overtones')
+        print("set overtones called")
+        if not np.any([m.match(k) for k in f[det].keys()]):
+            f[det].create_group('overtones')
+            print("overtones created")
+        f[det]['overtones'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
+        return cls
 
     @classmethod
     def setOrig(cls,f,det,c,data):
         m = re.compile('orig')
+        print("set orig called")
         if not np.any([m.match(k) for k in f[det].keys()]):
             f[det].create_group('orig')
+            print("orig created")
         f[det]['orig'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
         return cls
 
@@ -300,6 +398,7 @@ class Params:
     def setSpect(cls,f,det,c,data):
         m = re.compile('spect')
         if not np.any([m.match(k) for k in f[det].keys()]):
+            print("spect created")
             f[det].create_group('spect')
         f[det]['spect'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
         return cls
