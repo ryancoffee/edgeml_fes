@@ -8,6 +8,9 @@ import os
 from scipy.fft import rfft,irfft
 import matplotlib.pyplot as plt
 from scipy import signal
+from PIL import Image, ImageFilter
+import cv2
+from sklearn.preprocessing import MinMaxScaler
 
 #'BESFU', 'BESSU', 'ece', 'ecevs' the new channel names in shot files
 
@@ -40,7 +43,7 @@ class Params:
         self.tid = -1
         self.method = 'fft'
         _ = [print('%s:%s'%(k,self.dets[k])) for k in self.dets.keys()]
-        self.satbits = 16
+        self.satbits = 32
 
 
     def getProcID(self):
@@ -187,7 +190,12 @@ class Params:
                 # plt.plot(chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T.flatten('F'))
                 # plt.show()
                 
-                x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
+                # x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
+                x = chandata.reshape(-1,self.nsamples[detkey]).T
+                
+                plt.plot(x.flatten("F"))
+                plt.title("raw "+str(self.shot)+" "+str(chan))
+                plt.show()
                 
                 Params.setOrig(h5out,detkey,chan,data=x) # will cast as np.float16
                 # compute rfft on each column and the reverse of each column but due to transpose
@@ -199,15 +207,86 @@ class Params:
                     elm_back = irfft(ELMX,norm='forward')
                     Params.setElm(h5out,detkey,chan,data=elm_back[:self.nsamples[detkey],:])
                 # saturate the spectrogram and self.satbits = 16
-                S = utils.saturate_uint(np.abs(X).real,self.satbits).astype(np.uint16)
-                
-
-                # plt.imshow(S)
-                # plt.title(str(self.shot)+" "+str(chan))
-                # plt.gca().invert_yaxis()
-                # plt.show()
-                
+                S = utils.saturate_uint(np.abs(X).real,self.satbits).astype(np.uint32)
                 Params.setSpect(h5out,detkey,chan,data=S)
+                # print("max: ", np.max(S), " pos: ", np.unravel_index(np.argmax(S), S.shape))
+                # print("pos 0: ", S[0])
+                
+                # set first 5 rows to 0 because they are a lot brighter than other rows 
+                S[:5, :] = 0 
+                plt.imshow(S, vmax=2**14)
+                plt.title(str(self.shot)+" "+str(chan))
+                plt.gca().invert_yaxis()
+                plt.show()
+                
+                
+#                 # apply laplacian blur
+#                 laplacian = cv2.Laplacian(S.astype(np.uint8), cv2.CV_64F)
+
+#                 # sobel x filter where dx=1 and dy=0
+#                 sobelx = cv2.Sobel(S.astype(np.uint8), cv2.CV_64F, 1, 0, ksize=7)
+
+#                 # sobel y filter where dx=0 and dy=1
+#                 sobely = cv2.Sobel(S.astype(np.uint8), cv2.CV_64F, 0, 1, ksize=7)
+
+#                 # combine sobel x and y
+#                 sobel = cv2.bitwise_and(sobelx, sobely)
+
+#                 # plot images
+#                 plt.subplot(2, 2, 1)
+#                 plt.imshow(laplacian, cmap='gray')
+#                 plt.title('Laplacian')
+
+#                 plt.subplot(2, 2, 2)
+#                 plt.imshow(sobelx, cmap='gray')
+#                 plt.title('SobelX')
+
+#                 plt.subplot(2, 2, 3)
+#                 plt.imshow(sobely, cmap='gray')
+#                 plt.title('SobelY')
+
+#                 plt.subplot(2, 2, 4)
+#                 plt.imshow(sobel, cmap='gray')
+#                 plt.title('Sobel')
+#                 plt.show()
+                
+#                 S_img = Image.fromarray(S, "L")
+                
+#                 sobelx = S_img.filter(ImageFilter.Kernel((3, 3), (1, 0, -1, 2, 0,
+#                                           -2, 1, 0, -1), 1, 0))
+#                 plt.imshow(sobelx)
+#                 plt.title("sobel x " + str(self.shot)+" "+str(chan))
+#                 plt.colorbar()
+#                 plt.gca().invert_yaxis()
+#                 plt.show()
+                
+#                 sobely = S_img.filter(ImageFilter.Kernel((3, 3), (1, 2, 1, 0, 0,
+#                                           0, -1, -2, -1), 1, 0))
+#                 plt.imshow(sobely)
+#                 plt.title("sobel y " + str(self.shot)+" "+str(chan))
+#                 plt.colorbar()
+#                 plt.gca().invert_yaxis()
+#                 plt.show()
+                
+#                 kernel = ImageFilter.Kernel(
+#                             size=(3, 3),
+#                             kernel=[
+#                                 1 / 9, 1 / 9, 1 / 9,
+#                                 1 / 9, 1 / 9, 1 / 9,
+#                                 1 / 9, 1 / 9, 1 / 9
+#                             ],
+#                             scale=1,
+#                             offset=0
+#                         )
+#                 lowpass = S_img.filter(kernel)
+                
+#                 plt.imshow(lowpass)
+#                 plt.title("low pass " + str(self.shot)+" "+str(chan))
+#                 plt.colorbar()
+#                 plt.gca().invert_yaxis()
+#                 plt.show()
+                
+                
 
                 overtones = self.findOvertones(S, minimum_peak_height=2000)
                 Params.setOvertones(h5out, detkey, chan , data=overtones)
@@ -325,15 +404,16 @@ class Params:
     def findOvertones(cls,spec, minimum_peak_height):
         print(np.shape(spec.T))
         col_indent = 0
-        peakWidths = np.zeros(len(spec.T))
+        peakWidths = np.zeros(len(spec.T)) #proportional to the peak width of first peak
+        var_peak = np.zeros(len(spec.T)) #variance of points after peakwidth achieved
         for col_count, col in enumerate(spec.T[col_indent:]):
             # if col_count %5 == 0:
             #     continue
-            if col_count %200 == 0:
-                print("col count: ", col_count)
-            # plt.plot(col)
-            # plt.title("column "+str(col_indent+col_count)+" of fft")
-            # plt.show()
+            # if col_count %200 == 0:
+            #     print("col count: ", col_count)
+            #     plt.plot(col)
+            #     plt.title("column "+str(col_indent+col_count)+" of fft")
+            #     plt.show()
             
             # peaks = signal.find_peaks_cwt(col, 4.0, min_snr = 1)
 #             peaks = [count for count in range(len(col))]
@@ -347,30 +427,55 @@ class Params:
             
             onlyPeaks[onlyPeaks < minimum_peak_height] = 0
             
+            # if col_count % 200 == 0:
+            #     plt.plot(onlyPeaks)
+            #     plt.title("only peaks column "+str(col_indent+col_count)+" of fft")
+            #     plt.show()
             
-            # plt.plot(onlyPeaks)
-            # plt.title("only peaks column "+str(col_indent+col_count)+" of fft")
-            # plt.show()
-            
+            spec_2_0pad = rfft(np.concatenate((onlyPeaks, np.zeros(50*len(onlyPeaks)).astype(float))))
             spec_2 = rfft(onlyPeaks)
             target = spec_2[0]*0.1
             target_counter = 0
             peak_width = 0
+            var_dist = 10
             while (1):
                 if peak_width > 50:
                     peak_width = 0
                     break
                 elif spec_2[peak_width] <= target:
                     target_counter +=1
-                    if target_counter >= 4:
+                    if target_counter >= 1:
                         break
                 peak_width += 1
             #print("col = ", col_indent+col_count, " peak_width: ", peak_width)
+            var_peak[col_count] = np.var(spec_2[peak_width:peak_width+var_dist])
             peakWidths[col_count] = peak_width
-            # plt.plot(spec_2.real)
-            # plt.show()
-        # plt.plot(peakWidths)
-        # plt.title("peak widths for every column")
+            # if col_count > 1200 and col_count < 1205:
+            #     plt.plot(spec_2.real)
+            #     plt.show()
+        stab_his = 10
+        cleanedPeakWidths = np.copy(peakWidths)
+        for i in range(stab_his, len(cleanedPeakWidths)):
+    # Check if the previous 10 elements are all greater than 0
+            if any(peakWidths[i-stab_his:i] == 0):
+                cleanedPeakWidths[i] = 0
+            else:
+                cleanedPeakWidths[i-stab_his:i] = peakWidths[i-stab_his:i]
+            
+        
+        # scaler = MinMaxScaler(feature_range=(0, 50))
+        # scaled_var_peak = scaler.fit_transform(var_peak.reshape(1, -1))
+        
+        fig, ax = plt.subplots(1, 2)
+        ax[0].plot(cleanedPeakWidths, label="peak widths")
+        ax[1].plot(var_peak, label="variance of the next "+str(var_dist)+" data points after bottom of peak")
+        ax[0].set_title("cleaned peak widths for every column")
+        ax[1].set_title("variance of the next "+str(var_dist)+" data points after bottom of peak")
+        plt.show()
+        
+        # integral = np.cumsum(cleanedPeakWidths)
+        # plt.plot(integral)
+        # plt.title("integral of cleaned peak widths")
         # plt.show()
         return peakWidths
         
