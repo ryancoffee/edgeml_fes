@@ -11,6 +11,7 @@ from scipy import signal
 from PIL import Image, ImageFilter
 import cv2
 from sklearn.preprocessing import MinMaxScaler
+from scipy.optimize import curve_fit
 
 #'BESFU', 'BESSU', 'ece', 'ecevs' the new channel names in shot files
 
@@ -214,7 +215,7 @@ class Params:
                 
                 # set first 5 rows to 0 because they are a lot brighter than other rows 
                 S[:5, :] = 0 
-                plt.imshow(S, vmax=2**14)
+                plt.imshow(S, vmax=2**19)
                 plt.title(str(self.shot)+" "+str(chan))
                 plt.gca().invert_yaxis()
                 plt.show()
@@ -288,7 +289,7 @@ class Params:
                 
                 
 
-                overtones = self.findOvertones(S, minimum_peak_height=2000)
+                overtones = self.findOvertones(S, minimum_peak_height=10000)
                 Params.setOvertones(h5out, detkey, chan , data=overtones)
                 
                 # Q = rfft(np.concatenate((S.astype(float),np.flip(S.astype(float),axis=0)),axis=0),axis=0)
@@ -398,14 +399,27 @@ class Params:
 
     def getChan(self,det):
         return self.chan[det]
-
     
+    @classmethod
+    # Define the sinc function
+    def sinc_function(cls, x, a, b):
+        return a * np.sinc(b * x)
     @classmethod
     def findOvertones(cls,spec, minimum_peak_height):
         print(np.shape(spec.T))
         col_indent = 0
         peakWidths = np.zeros(len(spec.T)) #proportional to the peak width of first peak
         var_peak = np.zeros(len(spec.T)) #variance of points after peakwidth achieved
+        find_overtones_range = [0, 1<<32] #set everything outside of this range to 0
+        inds = np.where(spec<find_overtones_range[0])
+        spec[inds] = 0
+        inds = np.where(spec>find_overtones_range[1])
+        spec[inds] = 0
+        plt.imshow(spec)
+        plt.gca().invert_yaxis()
+        plt.show()
+        
+        
         for col_count, col in enumerate(spec.T[col_indent:]):
             # if col_count %5 == 0:
             #     continue
@@ -431,9 +445,11 @@ class Params:
             #     plt.plot(onlyPeaks)
             #     plt.title("only peaks column "+str(col_indent+col_count)+" of fft")
             #     plt.show()
-            
-            spec_2_0pad = rfft(np.concatenate((onlyPeaks, np.zeros(50*len(onlyPeaks)).astype(float))))
-            spec_2 = rfft(onlyPeaks)
+            pad = False
+            if pad:
+                spec_2 = rfft(np.concatenate((onlyPeaks, np.zeros(0*len(onlyPeaks)).astype(float))))
+            else:
+                spec_2 = rfft(onlyPeaks)
             target = spec_2[0]*0.1
             target_counter = 0
             peak_width = 0
@@ -448,12 +464,29 @@ class Params:
                         break
                 peak_width += 1
             #print("col = ", col_indent+col_count, " peak_width: ", peak_width)
+            
+            # fitting a sinc function to the 2nd order fft of the column
             var_peak[col_count] = np.var(spec_2[peak_width:peak_width+var_dist])
             peakWidths[col_count] = peak_width
-            # if col_count > 1200 and col_count < 1205:
-            #     plt.plot(spec_2.real)
-            #     plt.show()
-        stab_his = 10
+            
+            
+            # Fit the cosine function to the data
+#             spec_2_X = np.arange(len(spec_2.real))
+#             popt, pcov = curve_fit(cls.sinc_function, spec_2_X, spec_2.real, p0 = [spec_2.real[0]*1.5, 1e-2], maxfev=10000, method="lm")
+
+#             # Generate y values using the fitted parameters
+#             y_fit = cls.sinc_function(spec_2_X, *popt)
+
+            
+            if col_count > 1200 and col_count < 1210:
+                plt.plot(spec_2.real, label = "second order fft per column real")
+                plt.plot(spec_2.imag, label = "second order fft per column imaginary")
+                
+                plt.plot(np.power(np.abs(spec_2), int(2))*1e-6, label = "second order fft per column absolute square")
+                # plt.plot(y_fit, label = "sinc function")
+                plt.legend()
+                plt.show()
+        stab_his = 5
         cleanedPeakWidths = np.copy(peakWidths)
         for i in range(stab_his, len(cleanedPeakWidths)):
     # Check if the previous 10 elements are all greater than 0
@@ -463,15 +496,15 @@ class Params:
                 cleanedPeakWidths[i-stab_his:i] = peakWidths[i-stab_his:i]
             
         
-        # scaler = MinMaxScaler(feature_range=(0, 50))
-        # scaled_var_peak = scaler.fit_transform(var_peak.reshape(1, -1))
+
         
-        fig, ax = plt.subplots(1, 2)
-        ax[0].plot(cleanedPeakWidths, label="peak widths")
-        ax[1].plot(var_peak, label="variance of the next "+str(var_dist)+" data points after bottom of peak")
-        ax[0].set_title("cleaned peak widths for every column")
-        ax[1].set_title("variance of the next "+str(var_dist)+" data points after bottom of peak")
-        plt.show()
+        if False:
+            fig, ax = plt.subplots(1, 2)
+            ax[0].plot(cleanedPeakWidths, label="peak widths")
+            ax[1].plot(var_peak, label="variance of the next "+str(var_dist)+" data points after bottom of peak")
+            ax[0].set_title("cleaned peak widths for every column")
+            ax[1].set_title("variance of the next "+str(var_dist)+" data points after bottom of peak")
+            plt.show()
         
         # integral = np.cumsum(cleanedPeakWidths)
         # plt.plot(integral)
