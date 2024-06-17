@@ -210,8 +210,7 @@ class Params:
                 # saturate the spectrogram and self.satbits = 16
                 S = utils.saturate_uint(np.abs(X).real,self.satbits).astype(np.uint32)
                 Params.setSpect(h5out,detkey,chan,data=S)
-                # print("max: ", np.max(S), " pos: ", np.unravel_index(np.argmax(S), S.shape))
-                # print("pos 0: ", S[0])
+
                 
                 # set first 5 rows to 0 because they are a lot brighter than other rows 
                 S[:5, :] = 0 
@@ -220,76 +219,13 @@ class Params:
                 plt.gca().invert_yaxis()
                 plt.show()
                 
+                plt.imshow(S, vmax=2**13)
+                plt.title(str(self.shot)+" "+str(chan))
+                plt.gca().invert_yaxis()
+                plt.show()
                 
-#                 # apply laplacian blur
-#                 laplacian = cv2.Laplacian(S.astype(np.uint8), cv2.CV_64F)
-
-#                 # sobel x filter where dx=1 and dy=0
-#                 sobelx = cv2.Sobel(S.astype(np.uint8), cv2.CV_64F, 1, 0, ksize=7)
-
-#                 # sobel y filter where dx=0 and dy=1
-#                 sobely = cv2.Sobel(S.astype(np.uint8), cv2.CV_64F, 0, 1, ksize=7)
-
-#                 # combine sobel x and y
-#                 sobel = cv2.bitwise_and(sobelx, sobely)
-
-#                 # plot images
-#                 plt.subplot(2, 2, 1)
-#                 plt.imshow(laplacian, cmap='gray')
-#                 plt.title('Laplacian')
-
-#                 plt.subplot(2, 2, 2)
-#                 plt.imshow(sobelx, cmap='gray')
-#                 plt.title('SobelX')
-
-#                 plt.subplot(2, 2, 3)
-#                 plt.imshow(sobely, cmap='gray')
-#                 plt.title('SobelY')
-
-#                 plt.subplot(2, 2, 4)
-#                 plt.imshow(sobel, cmap='gray')
-#                 plt.title('Sobel')
-#                 plt.show()
-                
-#                 S_img = Image.fromarray(S, "L")
-                
-#                 sobelx = S_img.filter(ImageFilter.Kernel((3, 3), (1, 0, -1, 2, 0,
-#                                           -2, 1, 0, -1), 1, 0))
-#                 plt.imshow(sobelx)
-#                 plt.title("sobel x " + str(self.shot)+" "+str(chan))
-#                 plt.colorbar()
-#                 plt.gca().invert_yaxis()
-#                 plt.show()
-                
-#                 sobely = S_img.filter(ImageFilter.Kernel((3, 3), (1, 2, 1, 0, 0,
-#                                           0, -1, -2, -1), 1, 0))
-#                 plt.imshow(sobely)
-#                 plt.title("sobel y " + str(self.shot)+" "+str(chan))
-#                 plt.colorbar()
-#                 plt.gca().invert_yaxis()
-#                 plt.show()
-                
-#                 kernel = ImageFilter.Kernel(
-#                             size=(3, 3),
-#                             kernel=[
-#                                 1 / 9, 1 / 9, 1 / 9,
-#                                 1 / 9, 1 / 9, 1 / 9,
-#                                 1 / 9, 1 / 9, 1 / 9
-#                             ],
-#                             scale=1,
-#                             offset=0
-#                         )
-#                 lowpass = S_img.filter(kernel)
-                
-#                 plt.imshow(lowpass)
-#                 plt.title("low pass " + str(self.shot)+" "+str(chan))
-#                 plt.colorbar()
-#                 plt.gca().invert_yaxis()
-#                 plt.show()
-                
-                
-
-                overtones = self.findOvertones(S, minimum_peak_height=10000)
+    
+                overtones = self.findOvertones(S, minimum_peak_height=0)
                 Params.setOvertones(h5out, detkey, chan , data=overtones)
                 
                 # Q = rfft(np.concatenate((S.astype(float),np.flip(S.astype(float),axis=0)),axis=0),axis=0)
@@ -404,20 +340,39 @@ class Params:
     # Define the sinc function
     def sinc_function(cls, x, a, b):
         return a * np.sinc(b * x)
+    
+    
+    @classmethod
+    # Define the sinc function
+    def instant_slope(cls, arr, slope_size):
+        return arr[0] - arr[slope_size]
+    
+    @classmethod
+    # Define the sinc function
+    def stabilize(cls, original, stab_his):
+        clean = np.copy(original)
+        for i in range(stab_his, len(clean)):
+        # Check if the previous 10 elements are all greater than 0
+            if any(original[i-stab_his:i] == 0):
+                clean[i] = 0
+            else:
+                clean[i-stab_his:i] = original[i-stab_his:i]
+        return clean
+        
+    
     @classmethod
     def findOvertones(cls,spec, minimum_peak_height):
         print(np.shape(spec.T))
         col_indent = 0
+        power_spec_classifier = np.zeros(len(spec.T)) #based on second order fft power spectrum, initial velocity
         peakWidths = np.zeros(len(spec.T)) #proportional to the peak width of first peak
         var_peak = np.zeros(len(spec.T)) #variance of points after peakwidth achieved
+        
         find_overtones_range = [0, 1<<32] #set everything outside of this range to 0
         inds = np.where(spec<find_overtones_range[0])
         spec[inds] = 0
         inds = np.where(spec>find_overtones_range[1])
         spec[inds] = 0
-        plt.imshow(spec)
-        plt.gca().invert_yaxis()
-        plt.show()
         
         
         for col_count, col in enumerate(spec.T[col_indent:]):
@@ -477,23 +432,37 @@ class Params:
 #             # Generate y values using the fitted parameters
 #             y_fit = cls.sinc_function(spec_2_X, *popt)
 
-            
-            if col_count > 1200 and col_count < 1210:
+            spec_abs = np.power(np.abs(spec_2), int(2))
+            instant_slope = cls.instant_slope(spec_abs, 50) # find difference between index 0 and index 50 of power spectrum of second fft
+            power_spec_classifier[col_count] = instant_slope
+    
+            if col_count > 1200 and col_count < 1210 and False:
                 plt.plot(spec_2.real, label = "second order fft per column real")
                 plt.plot(spec_2.imag, label = "second order fft per column imaginary")
-                
-                plt.plot(np.power(np.abs(spec_2), int(2))*1e-6, label = "second order fft per column absolute square")
+                spec_abs = np.power(np.abs(spec_2), int(2))*1e-3
+                plt.plot(spec_abs, label = "second order fft per column absolute square")
                 # plt.plot(y_fit, label = "sinc function")
                 plt.legend()
+                plt.title("2nd order fft of column: "+str(col_count))
+                plt.show()
+                fft_abs_grad = np.gradient(spec_abs*1e-3, np.arange(len(spec_abs)))
+                plt.title("gradient of 2nd order fft of column: "+str(col_count))
+                plt.plot(fft_abs_grad)
                 plt.show()
         stab_his = 5
-        cleanedPeakWidths = np.copy(peakWidths)
-        for i in range(stab_his, len(cleanedPeakWidths)):
-    # Check if the previous 10 elements are all greater than 0
-            if any(peakWidths[i-stab_his:i] == 0):
-                cleanedPeakWidths[i] = 0
-            else:
-                cleanedPeakWidths[i-stab_his:i] = peakWidths[i-stab_his:i]
+        
+        cleanedPeakWidths = cls.stabilize(peakWidths, stab_his)
+        
+        cleaned_power_spec_classifier = cls.stabilize(power_spec_classifier, 1)
+        
+        
+    #     cleanedPeakWidths = np.copy(peakWidths)
+    #     for i in range(stab_his, len(cleanedPeakWidths)):
+    # # Check if the previous 10 elements are all greater than 0
+    #         if any(peakWidths[i-stab_his:i] == 0):
+    #             cleanedPeakWidths[i] = 0
+    #         else:
+    #             cleanedPeakWidths[i-stab_his:i] = peakWidths[i-stab_his:i]
             
         
 
@@ -506,6 +475,10 @@ class Params:
             ax[1].set_title("variance of the next "+str(var_dist)+" data points after bottom of peak")
             plt.show()
         
+        
+        plt.plot(cleaned_power_spec_classifier)
+        plt.title("classifier based on power spectrum")
+        plt.show()
         # integral = np.cumsum(cleanedPeakWidths)
         # plt.plot(integral)
         # plt.title("integral of cleaned peak widths")
