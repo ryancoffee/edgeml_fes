@@ -28,19 +28,20 @@ def stabilize(original, stab_hist):
 
 # Generate sample data for imshow
 def generate_data(filename, detector, minimum_peak_height, fft_vmax, slope_dist, stab_hist):
-    nsamples = 512
+    nsamples = 512 #useful for reshaping
     with h5py.File("/sdf/scratch/coffee/edgeml_fes_data/"+filename, "r") as f:
+        
         for i in f['ece'].keys():
-            #print(str(detector), i[-len(str(detector)):])
             if str(detector) == i[-len(str(detector)):]: #if end of key is detector number
                 detector_key = i
-                #print(detector_key)
-        raw = f["ece"][detector_key][()]*(1<<10) #raw data
+
+        raw = f["ece"][detector_key][()]*(1<<10) #raw data scaled
 
         raw_reshape = raw.reshape(-1,nsamples).T #reshape to be ? x 512
 
         fft = rfft(np.concatenate((raw_reshape,np.flip(raw_reshape,axis=0)),axis=0),axis=0,norm='backward') #apply fft
         fft[:5, :] = 0 #first 5 rows to 0
+        
         inds = np.where(np.sign(fft) == -1) #make sure there are no negatives
         fft[inds] = 0
         fft = np.abs(fft.real)
