@@ -11,15 +11,19 @@ import os
 from scipy.fft import rfft,irfft
 import matplotlib.pyplot as plt
 import h5py
+import math
 
 def stabilize(original, stab_hist):
     clean = np.copy(original)
+    epsilon = math.floor(math.log10(max(original)))-1
+    print("eps: ", epsilon, " min: ", min(original))
     for i in range(stab_hist, len(clean)):
     # Check if the previous 10 elements are all greater than 0
-        if any(original[i-stab_hist:i] == 0):
+        if any(np.abs(original[i-stab_hist:i]) < 10**epsilon):
             clean[i] = 0
         else:
             clean[i-stab_hist:i] = original[i-stab_hist:i]
+    print(original == clean)
     return clean
 
 # Generate sample data for imshow
@@ -31,8 +35,10 @@ def generate_data(filename, detector, minimum_peak_height, fft_vmax, slope_dist,
             if str(detector) == i[-len(str(detector)):]: #if end of key is detector number
                 detector_key = i
                 #print(detector_key)
-        raw = f["ece"][detector_key][()] #raw data
+        raw = f["ece"][detector_key][()]*(1<<10) #raw data
+
         raw_reshape = raw.reshape(-1,nsamples).T #reshape to be ? x 512
+
         fft = rfft(np.concatenate((raw_reshape,np.flip(raw_reshape,axis=0)),axis=0),axis=0,norm='backward') #apply fft
         fft[:5, :] = 0 #first 5 rows to 0
         inds = np.where(np.sign(fft) == -1) #make sure there are no negatives
@@ -42,12 +48,12 @@ def generate_data(filename, detector, minimum_peak_height, fft_vmax, slope_dist,
         power_spec_classifier = np.zeros(len(fft.T))
         
         for col_count, col in enumerate(fft.T):
-            cleaned_col = col[:]
+            cleaned_col = np.copy(col)
             cleaned_col[cleaned_col < minimum_peak_height] = 0 #set peaks in raw data below a certain height to 0
             
-            spec_2 = rfft(col)
+            spec_2 = rfft(cleaned_col)
             spec_abs = np.power(np.abs(spec_2), int(2))
-            instant_slope = spec_abs[0] - spec_abs[slope_dist] # find difference between index 0 and index 50 of power spectrum of second fft
+            instant_slope = spec_abs[0] - np.average(spec_abs[slope_dist: slope_dist + (slope_dist//10)]) # find difference between index 0 and index 50 of power spectrum of second fft
             power_spec_classifier[col_count] = instant_slope
             
         cleaned_power_spec_classifier = stabilize(power_spec_classifier, stab_hist)
@@ -100,7 +106,7 @@ def update_plot(*args):
     print("FFT Vmax:", fft_vmax)
     print("Slope Distance:", slope_dist)
     print("Stabilization History:", stab_hist)
-    raw, fft, classified = generate_data(str(filename), int(detector), int(minimum_height), int(fft_vmax), slope_dist, stab_hist)
+    raw, fft, classified = generate_data(str(filename), int(detector), int(minimum_height), int(fft_vmax), int(slope_dist), int(stab_hist))
     
     ax1.clear()
     im1 = ax1.plot(raw)
@@ -123,6 +129,9 @@ def update_plot(*args):
     
 
     canvas.draw()
+    
+    print("End of update")
+    print("------------------------------------")
 
     
     
