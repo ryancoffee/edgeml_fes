@@ -16,15 +16,15 @@ import math
 def stabilize(original, stab_hist):
     clean = np.copy(original)
     epsilon = math.floor(math.log10(max(original)))-1
-    print("eps: ", epsilon, " min: ", min(original))
     for i in range(stab_hist, len(clean)):
     # Check if the previous 10 elements are all greater than 0
         if any(np.abs(original[i-stab_hist:i]) < 10**epsilon):
             clean[i] = 0
         else:
             clean[i-stab_hist:i] = original[i-stab_hist:i]
-    print(original == clean)
     return clean
+
+
 
 # Generate sample data for imshow
 def generate_data(filename, detector, minimum_peak_height, fft_vmax, slope_dist, stab_hist):
@@ -49,7 +49,11 @@ def generate_data(filename, detector, minimum_peak_height, fft_vmax, slope_dist,
         
         for col_count, col in enumerate(fft.T):
             cleaned_col = np.copy(col)
-            cleaned_col[cleaned_col < minimum_peak_height] = 0 #set peaks in raw data below a certain height to 0
+            if minimum_peak_height == -1:
+                cleaned_col = cleaned_col * np.tanh(cleaned_col) #linearly scales but sends to 0 near 0
+            else:
+                cleaned_col[cleaned_col < minimum_peak_height] = 0 #set peaks in raw data below a certain height to 0
+                
             
             spec_2 = rfft(cleaned_col)
             spec_abs = np.power(np.abs(spec_2), int(2))
@@ -110,17 +114,17 @@ def update_plot(*args):
     
     ax1.clear()
     im1 = ax1.plot(raw)
-    ax1.set_title("raw data for detector "+str(detector))
+    ax1.set_title("raw data for detector "+str(int(detector)))
     
 
     ax2.clear()
     im2 = ax2.imshow(fft, vmax=int(fft_vmax))  # Example: Using different colormap
     ax2.invert_yaxis()
-    ax2.set_title("fft for detector "+str(detector))
+    ax2.set_title("fft for detector "+str(int(detector)))
     
     ax3.clear()
     im3 = ax3.plot(classified)  # Example: Using different colormap
-    ax3.set_title("classifier for detector "+str(detector))
+    ax3.set_title("classifier for detector "+str(int(detector)))
     
     
     
@@ -165,7 +169,7 @@ detector_menu.pack(side=tk.LEFT, padx=10)
 detector_menu.bind('<<ComboboxSelected>>', update_plot)
 
 # min peak height
-min_height_label = ttk.Label(root, text="Enter Minimum Peak Height (before fft):")
+min_height_label = ttk.Label(root, text="Enter Minimum Peak Height (before 2nd fft), set to -1 for xtanhx:")
 min_height_label.pack(side=tk.LEFT, padx=10)
 min_height_entry = ttk.Entry(root)
 min_height_entry.pack(side=tk.LEFT, padx=10)
