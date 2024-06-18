@@ -39,7 +39,6 @@ def generate_data(filename, detector, minimum_peak_height, fft_vmax, slope_dist,
                 detector_key = i
 
         raw = ((f["ece"][detector_key][()]*(1<<10)).astype(np.int32)) #raw data scaled
-        print(raw)
 
         raw_reshape = raw.reshape(-1,nsamples).T #reshape to be ? x 512
 
