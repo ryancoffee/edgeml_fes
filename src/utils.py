@@ -27,6 +27,9 @@ def selectchanwin(d,c1,c2):
 def soft_saturate(x,limit=10):
     return limit*np.tanh(x/limit)
 
+def saturate_float(x,limit=10):
+    return limit*np.tanh(x/limit)
+
 def saturate_uint(x,bits):
     inds = np.where(x>((1<<bits)-1))
     x[inds] = ((1<<bits)-1)
