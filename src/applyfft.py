@@ -8,7 +8,7 @@ import re
 def main(fpath, save_path):
     all_files = os.listdir(fpath)
     all_files = list(filter(lambda x: "shot" in x, all_files))
-    for file in all_files:
+    for file in all_files[:60]:
         try:
             print(file)
             shot_no = re.search(r'\d+', file).group()

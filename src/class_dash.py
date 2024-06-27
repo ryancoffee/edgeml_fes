@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 import re
-import numpy as np
 import utils
 import gc
 import os
@@ -241,6 +240,16 @@ fft_vmax_label.pack(side=tk.LEFT, padx=10)
 fft_vmax_entry = ttk.Entry(frame_b)
 fft_vmax_entry.pack(side=tk.LEFT, padx=10)
 fft_vmax_entry.bind('<Return>', update_plot)  # Update plot when pressing Enter
+
+# detector
+detector_var = tk.IntVar(value=1)
+detector_label = ttk.Label(frame_b, text="Plot ")
+detector_label.pack(side=tk.LEFT, padx=10)
+detector_menu = ttk.Combobox(frame_b, textvariable=detector_var)
+detector_menu['values'] = list(range(1, 49))
+detector_menu.pack(side=tk.LEFT, padx=10)
+detector_menu.bind('<<ComboboxSelected>>', update_plot)
+
 
 # fft x min
 fft_x_min_label = ttk.Label(frame_b, text="x min for fft") #in the 2nd fft how far from index 0 should you calculate the slope
