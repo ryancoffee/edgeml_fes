@@ -179,7 +179,7 @@ class Params:
             print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
             print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
-
+            spect_data = []
             for chan,chandata in enumerate(self.data[detkey]):
                 print("chan: ", chan)
                 if False and detkey=='ece' and (chan<10 or chan>25): #set False to True for quickly checking on bugs
@@ -194,23 +194,26 @@ class Params:
                 # x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
                 x = chandata.reshape(-1,self.nsamples[detkey]).T
                 
-                plt.plot(x.flatten("F"))
-                plt.title("raw "+str(self.shot)+" "+str(chan))
-                plt.show()
+                # plt.plot(x.flatten("F"))
+                # plt.title("raw "+str(self.shot)+" "+str(chan))
+                # plt.show()
                 
                 Params.setOrig(h5out,detkey,chan,data=x) # will cast as np.float16
                 # compute rfft on each column and the reverse of each column but due to transpose
                 # X = rfft(x,axis=0,norm='backward')
                 X = rfft(np.concatenate((x,np.flip(x,axis=0)),axis=0),axis=0,norm='backward')
+                
                 self.maxfreq[detkey] = 1./(2.*self.tstep[detkey])
                 if detkey=='bes':
                     ELMX = X*self.elm_filt[detkey]
                     elm_back = irfft(ELMX,norm='forward')
                     Params.setElm(h5out,detkey,chan,data=elm_back[:self.nsamples[detkey],:])
+
                 # saturate the spectrogram and self.satbits = 16
                 S = utils.saturate_uint(np.abs(X).real,self.satbits).astype(np.uint32)
                 Params.setSpect(h5out,detkey,chan,data=S)
-
+                spect_data.append(S)
+                '''
                 
                 # set first 5 rows to 0 because they are a lot brighter than other rows 
                 S[:5, :] = 0 
@@ -239,7 +242,23 @@ class Params:
                 # Params.setLogic(h5out,detkey,chan,data=logic)
                 # e,s,ne = utils.scanedges(logic,thresh=1<<10,expand=self.expand[detkey])
                 # Params.setEdges(h5out,detkey,chan,data=(e,s,ne))
-        return self
+                '''
+                
+            S_reform = np.zeros((S.shape[0] , len(self.data[detkey]), S.shape[1]))    
+            spect_data = np.array(spect_data)
+            for detector_count, spect in enumerate(spect_data):
+                
+                for col_count, spect_column in enumerate(spect.T):
+                    
+                    S_reform[:, detector_count, col_count] = spect_column
+                    
+            
+                    
+                    
+            
+            Params.setSpectReform(h5out, detkey, 'remap', data=S_reform)
+            return self
+                
 
     def process(self,h5out):
         if self.method=='fft':
@@ -514,6 +533,16 @@ class Params:
         f[det]['spect'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
         return cls
 
+    @classmethod
+    def setSpectReform(cls,f,det,c,data):
+        m = re.compile('spect_reform')
+        if not np.any([m.match(k) for k in f[det].keys()]):
+            print("spect reform created")
+            f[det].create_group('spect_reform')
+        f[det]['spect_reform'].create_dataset(c,data=data.astype(np.float16),dtype=np.float16)
+        return cls
+    
+    
     @classmethod
     def setLogic(cls,f,det,c,data):
         m = re.compile('logic')
