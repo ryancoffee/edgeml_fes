@@ -28,4 +28,4 @@ def main(fpath, save_path):
 
 
 if __name__ in "__main__":
-    main(fpath = "/sdf/slac/mfe/shot_data/", save_path = "/sdf/data/slac/mfe/fft_data_reorg/")
+    main(fpath = "/sdf/data/slac/mfe/shot_data/", save_path = "/sdf/data/slac/mfe/fft_data_reorg/")
