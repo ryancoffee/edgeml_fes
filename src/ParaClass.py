@@ -69,10 +69,10 @@ class Params:
         return self
 
     def initTimesChans(self,f): # updated for Finn ecebes_######.h5 input files.
-        print('%s'%f.keys())
+        # print('%s'%f.keys())
         times = {}
         for dk,d in self.dets.items():
-            print('dk,d = %s,%s'%(dk,d))
+            # print('dk,d = %s,%s'%(dk,d))
             times[dk] = (f[d]['times'][()]*1e3+.26).astype(np.int32)
             # print("fd.keys: ", f[d].keys()) 
             # self.chans[dk] = []
@@ -172,21 +172,21 @@ class Params:
         return self
 
     def processFFT(self,h5out):
-        print("inside process fft")
+        # print("inside process fft")
         offset = 0 #1<<4
         for detkey in self.dets.keys():
-            print("detector = ", detkey)
-            print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
-            print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
+            # print("detector = ", detkey)
+            # print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
+            # print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
             spect_data = []
             for chan,chandata in enumerate(self.data[detkey]):
-                print("chan: ", chan)
+                # print("chan: ", chan)
                 if False and detkey=='ece' and (chan<10 or chan>25): #set False to True for quickly checking on bugs
                     continue
                 if True and detkey=='bes': #set False to True for quickly turning off bes
                     continue
-                print('working det %s channel %s'%(detkey,chan))
+                # print('working det %s channel %s'%(detkey,chan))
                 
                 # plt.plot(chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T.flatten('F'))
                 # plt.show()
@@ -507,7 +507,7 @@ class Params:
     @classmethod
     def setOvertones(cls, f, det, c , data):
         m = re.compile('overtones')
-        print("set overtones called")
+        # print("set overtones called")
         if not np.any([m.match(k) for k in f[det].keys()]):
             f[det].create_group('overtones')
             print("overtones created")
@@ -517,10 +517,10 @@ class Params:
     @classmethod
     def setOrig(cls,f,det,c,data):
         m = re.compile('orig')
-        print("set orig called")
+        # print("set orig called")
         if not np.any([m.match(k) for k in f[det].keys()]):
             f[det].create_group('orig')
-            print("orig created")
+            # print("orig created")
         f[det]['orig'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
         return cls
 
@@ -528,7 +528,7 @@ class Params:
     def setSpect(cls,f,det,c,data):
         m = re.compile('spect')
         if not np.any([m.match(k) for k in f[det].keys()]):
-            print("spect created")
+            # print("spect created")
             f[det].create_group('spect')
         f[det]['spect'].create_dataset('%02i'%c,data=data.astype(np.float16),dtype=np.float16)
         return cls
@@ -537,7 +537,7 @@ class Params:
     def setSpectReform(cls,f,det,c,data):
         m = re.compile('spect_reform')
         if not np.any([m.match(k) for k in f[det].keys()]):
-            print("spect reform created")
+            # print("spect reform created")
             f[det].create_group('spect_reform')
         f[det]['spect_reform'].create_dataset(c,data=data.astype(np.float16),dtype=np.float16)
         return cls
