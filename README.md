@@ -5,6 +5,10 @@ EdgeML for Fusion Energy Science project
 This work was supported by the Department of Energy, Office of Fusion Energy Science under Field Work Proposal 100636 "Machine Learning for Real-time Fusion Plasma Behavior Prediction and Manipulation."   
 This material is based upon work supported by the U.S. Department of Energy, Office of Science, Office of Fusion Energy Sciences, using the DIII-D National Fusion Facility, a DOE Office of Science user facility, under Award DE-FC02-04ER54698.  
 
+# Super-resolution  
+Connect with Raffi Nazikian with the Thomas Feurer paper on time-domain ptychography.  
+Also run a test of using random incommensurate sampling in time to recover higher frequency information from across channels of diagnostics.  How low of sampling can we do if we do stochastic distribution of sample times?   
+
 # Example filenames in sdf filesystem accessed via s3df  
 Each file is aobut 80% of a GB.  Counting 158-187k of them at 1GB each would gives a max of 29 thousand of 1GB files would be 29 TB.  
 I believe there is heavy duplication in the "time" variable that I will check for future reference.  

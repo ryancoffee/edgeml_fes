@@ -83,7 +83,7 @@ class Params:
 
     def fillData(self,f): # updated for Finn ecebes_######.h5 input files.
         for dk,d in self.dets.items():
-            self.data[dk] = [(f[d][c][()]*(1<<10)).astype(np.int16) for c in self.chans[dk]]
+            self.data[dk] = [(f[d][c][()]).astype(np.float16) for c in self.chans[dk]]
         return self
 
     def setMethod(self,x='fft'):
@@ -154,15 +154,21 @@ class Params:
 
     def processFFT(self,h5out):
         offset = 0 #1<<4
+        print('skipping bes')
         for detkey in self.dets.keys():
+            if detkey == 'bes':
+                next
             print('%s nfolds*nsamples = %i * %i = %i'%(detkey,self.nfolds[detkey],self.nsamples[detkey],self.nfolds[detkey]*self.nsamples[detkey]))
             print('len(data[%s]):\t%i'%(detkey,len(self.data[detkey])))
             ## threshold for ecedirectional max before zero crossing for frequencies th = 1e3*exp(-(x/500)**2)+100 where x is in index units as here.
 
             for chan,chandata in enumerate(self.data[detkey]):
+                if chan>10:
+                    print('returning early')
+                    return self
                 if False and detkey=='ece' and (chan<10 or chan>25): #set False to True for quickly checking on bugs
                     continue
-                if True and detkey=='bes': #set False to True for quickly turning off bes
+                if False and detkey=='bes': #set False to True for quickly turning off bes
                     continue
                 print('working det %s channel %s'%(detkey,chan))
                 x = chandata[self.inds_coince[detkey][:self.sz[detkey]]].reshape(self.nfolds[detkey],self.nsamples[detkey]).T
@@ -180,11 +186,12 @@ class Params:
                     ELMX = X*self.elm_filt[detkey]
                     elm_back = irfft(ELMX,norm='forward')
                     Params.setElm(h5out,detkey,chan,data=elm_back[:self.nsamples[detkey],:])
-                S = utils.saturate_uint(np.abs(X).real,self.satbits).astype(np.uint16)
+                S = utils.saturate_float(np.abs(X).real,np.float16(self.nsamples[detkey])).astype(np.float16)
                 Params.setSpect(h5out,detkey,chan,data=S)
                 Q = rfft(np.concatenate((S.astype(float),np.flip(S.astype(float),axis=0)),axis=0),axis=0)
-                Sback = utils.saturate_uint(irfft(Q*self.q_filt[detkey],axis=0).real,self.satbits).astype(np.uint16)
-                dSback = utils.saturate_int(irfft(Q*1j*self.dq_filt[detkey],axis=0).real.astype(int)>>6,self.satbits).astype(np.int16)
+                Sback = utils.saturate_float(irfft(Q*self.q_filt[detkey],axis=0).real,np.float16(self.nsamples[detkey])).astype(np.float16)
+                dSback = utils.saturate_float(irfft(Q*1j*self.dq_filt[detkey],axis=0).real.astype(np.float16),np.float16(self.nsamples[detkey])).astype(np.float16)
+                #dSback = utils.saturate_float(irfft(Q*1j*self.dq_filt[detkey],axis=0).real.astype(np.float16),np.float16(self.nsamples[detkey])**2).astype(np.float16)
                 logic = dSback[offset:self.nsamples[detkey],:]
                 print(np.max(logic),np.min(logic))
                 Params.setLogic(h5out,detkey,chan,data=logic)
